@@ -22,6 +22,7 @@ npm run ios
 
 ```bash
 npm test
+npm run test:e2e
 npm run typecheck
 npm run lint
 npm run export:web
@@ -34,4 +35,5 @@ npm run export:ios
 - iOS 네이티브 번들은 `expo-sqlite` 어댑터와 거래/상세 품목 테이블을 사용한다.
 - Web 번들은 브라우저 IndexedDB 어댑터를 사용하며 거래와 상세 품목을 별도 object store에 저장한다.
 - 홈 화면은 테스트 거래 한 건을 저장한 후 다시 조회해 결과를 표시한다.
+- Playwright는 데스크톱·모바일 Web에서 탭 이동과 IndexedDB 재실행 유지 여부를 검증한다.
 - 원격 동기화와 로그인은 P1 범위이므로 포함하지 않는다.

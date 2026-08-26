@@ -11,22 +11,25 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "test": "node --import tsx --test src/data/local-transaction-repository.test.ts",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:report": "playwright show-report",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.e2e.json --noEmit",
     "lint": "expo lint",
     "export:ios": "expo export --platform ios",
     "export:web": "expo export --platform web"
   },
   "dependencies": {
-    "@expo/ui": "~57.0.12",
-    "expo": "~57.0.15",
+    "@expo/ui": "~57.0.13",
+    "expo": "~57.0.16",
     "expo-constants": "~57.0.13",
     "expo-device": "~57.0.1",
     "expo-font": "~57.0.1",
     "expo-glass-effect": "~57.0.1",
     "expo-image": "~57.0.3",
     "expo-linking": "~57.0.7",
-    "expo-router": "~57.0.15",
-    "expo-splash-screen": "~57.0.7",
+    "expo-router": "~57.0.16",
+    "expo-splash-screen": "~57.0.8",
     "expo-sqlite": "~57.0.1",
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.2",
@@ -52,5 +55,10 @@
     "fake-indexeddb": "^6.2.5",
     "tsx": "^4.23.12",
     "typescript": "~6.0.3"
+  },
+  "overrides": {
+    "xcode": {
+      "uuid": "11.1.1"
+    }
   }
 }

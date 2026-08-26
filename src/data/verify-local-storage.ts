@@ -9,8 +9,14 @@ export async function verifyLocalStorage(
   repository: TransactionRepository,
 ): Promise<TransactionAggregate> {
   const testTransaction = createDayOneTestTransaction();
+  const existingTransaction = await repository.findById(
+    DAY_ONE_TEST_TRANSACTION_ID,
+  );
 
-  await repository.save(testTransaction);
+  if (!existingTransaction) {
+    await repository.save(testTransaction);
+  }
+
   const savedTransaction = await repository.findById(DAY_ONE_TEST_TRANSACTION_ID);
 
   if (!savedTransaction) {
@@ -26,4 +32,3 @@ export async function verifyLocalStorage(
 
   return savedTransaction;
 }
-

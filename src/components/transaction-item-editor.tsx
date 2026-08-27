@@ -1,3 +1,4 @@
+import { randomUUID } from 'expo-crypto';
 import { StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -10,7 +11,10 @@ import { ChoiceChips } from '@/components/ui/choice-chips';
 import { MoneyInput } from '@/components/ui/money-input';
 import { colors } from '@/constants/theme';
 import type { Category } from '@/domain/category';
-import type { ProductSuggestion } from '@/domain/autocomplete';
+import {
+  normalizeLookupValue,
+  type ProductSuggestion,
+} from '@/domain/autocomplete';
 import type { TransactionItemDraft } from '@/domain/transaction-draft';
 
 interface TransactionItemEditorProps {
@@ -72,7 +76,18 @@ export function TransactionItemEditor({
             : {}
         )}
         label={`품목 ${index + 1} 제품명`}
-        onChangeValue={(productName) => onChange({ ...item, productName })}
+        onChangeValue={(productName) =>
+          onChange({
+            ...item,
+            productId:
+              productSuggestions.some(({ id }) => id === item.productId) &&
+              normalizeLookupValue(productName) !==
+                normalizeLookupValue(item.productName)
+                ? randomUUID()
+                : item.productId,
+            productName,
+          })
+        }
         onSelectOption={(option) => {
           const product = productSuggestions.find(({ id }) => id === option.id);
           onChange({
@@ -143,7 +158,18 @@ export function TransactionItemEditor({
 
       <AppInput
         label={`품목 ${index + 1} 규격`}
-        onChangeText={(specification) => onChange({ ...item, specification })}
+        onChangeText={(specification) =>
+          onChange({
+            ...item,
+            productId:
+              productSuggestions.some(({ id }) => id === item.productId) &&
+              normalizeLookupValue(specification) !==
+                normalizeLookupValue(item.specification)
+                ? randomUUID()
+                : item.productId,
+            specification,
+          })
+        }
         placeholder="예: 2L, 500g"
         value={item.specification}
       />

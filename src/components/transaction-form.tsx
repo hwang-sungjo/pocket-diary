@@ -330,7 +330,12 @@ export function TransactionForm({ transactionId }: TransactionFormProps) {
             updateDraft((current) => ({
               ...current,
               merchantId: merchantName
-                ? exact?.id ?? current.merchantId ?? randomUUID()
+                ? exact?.id ??
+                  (suggestions.merchants.some(
+                    ({ id }) => id === current.merchantId,
+                  )
+                    ? randomUUID()
+                    : current.merchantId ?? randomUUID())
                 : null,
               merchantName,
             }));

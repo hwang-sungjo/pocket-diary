@@ -17,7 +17,7 @@ interface TransactionRow {
   occurred_at: string;
   category_id: string;
   merchant_id: string | null;
-  merchant_name: string | null;
+  merchant_name_snapshot: string | null;
   payment_method: string | null;
   memo: string | null;
   created_at: string;
@@ -28,7 +28,7 @@ interface TransactionItemRow {
   id: string;
   transaction_id: string;
   product_id: string;
-  product_name: string;
+  product_name_snapshot: string | null;
   category_id: string | null;
   quantity: number;
   unit_price: number | null;
@@ -46,7 +46,7 @@ function toTransaction(row: TransactionRow): Transaction {
     occurredAt: row.occurred_at,
     categoryId: row.category_id,
     merchantId: row.merchant_id,
-    merchantName: row.merchant_name,
+    merchantName: row.merchant_name_snapshot,
     paymentMethod: row.payment_method,
     memo: row.memo,
     createdAt: row.created_at,
@@ -59,7 +59,7 @@ function toTransactionItem(row: TransactionItemRow): TransactionItem {
     id: row.id,
     transactionId: row.transaction_id,
     productId: row.product_id,
-    productName: row.product_name,
+    productName: row.product_name_snapshot ?? '',
     categoryId: row.category_id,
     quantity: row.quantity,
     unitPrice: row.unit_price,
@@ -96,8 +96,8 @@ class SQLiteTransactionRepository implements TransactionRepository {
       await database.runAsync(
         `INSERT INTO transactions (
           id, type, name, total_amount, occurred_at, category_id, merchant_id,
-          payment_method, memo, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          merchant_name, payment_method, memo, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           type = excluded.type,
           name = excluded.name,
@@ -105,6 +105,7 @@ class SQLiteTransactionRepository implements TransactionRepository {
           occurred_at = excluded.occurred_at,
           category_id = excluded.category_id,
           merchant_id = excluded.merchant_id,
+          merchant_name = excluded.merchant_name,
           payment_method = excluded.payment_method,
           memo = excluded.memo,
           updated_at = excluded.updated_at`,
@@ -115,6 +116,7 @@ class SQLiteTransactionRepository implements TransactionRepository {
         transaction.occurredAt,
         transaction.categoryId,
         transaction.merchantId,
+        transaction.merchantName,
         transaction.paymentMethod,
         transaction.memo,
         transaction.createdAt,
@@ -146,12 +148,13 @@ class SQLiteTransactionRepository implements TransactionRepository {
 
         await database.runAsync(
           `INSERT INTO transaction_items (
-            id, transaction_id, product_id, category_id, quantity, unit_price,
-            total_price, specification, memo
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            id, transaction_id, product_id, product_name, category_id, quantity,
+            unit_price, total_price, specification, memo
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           item.id,
           item.transactionId,
           item.productId,
+          item.productName,
           item.categoryId,
           item.quantity,
           item.unitPrice,
@@ -166,7 +169,9 @@ class SQLiteTransactionRepository implements TransactionRepository {
   async findById(id: string): Promise<TransactionAggregate | null> {
     const database = await getNativeDatabase();
     const row = await database.getFirstAsync<TransactionRow>(
-      `SELECT transactions.*, merchants.name AS merchant_name
+      `SELECT transactions.*,
+              COALESCE(transactions.merchant_name, merchants.name)
+                AS merchant_name_snapshot
        FROM transactions
        LEFT JOIN merchants ON merchants.id = transactions.merchant_id
        WHERE transactions.id = ?`,
@@ -178,7 +183,9 @@ class SQLiteTransactionRepository implements TransactionRepository {
     }
 
     const itemRows = await database.getAllAsync<TransactionItemRow>(
-      `SELECT transaction_items.*, products.name AS product_name
+      `SELECT transaction_items.*,
+              COALESCE(transaction_items.product_name, products.name)
+                AS product_name_snapshot
        FROM transaction_items
        LEFT JOIN products ON products.id = transaction_items.product_id
        WHERE transaction_items.transaction_id = ?
@@ -195,7 +202,9 @@ class SQLiteTransactionRepository implements TransactionRepository {
   async list(): Promise<TransactionAggregate[]> {
     const database = await getNativeDatabase();
     const rows = await database.getAllAsync<TransactionRow>(
-      `SELECT transactions.*, merchants.name AS merchant_name
+      `SELECT transactions.*,
+              COALESCE(transactions.merchant_name, merchants.name)
+                AS merchant_name_snapshot
        FROM transactions
        LEFT JOIN merchants ON merchants.id = transactions.merchant_id
        ORDER BY occurred_at DESC`,

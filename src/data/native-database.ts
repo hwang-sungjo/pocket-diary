@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 
 import { DEFAULT_CATEGORIES } from '@/domain/category';
 
-const LATEST_SCHEMA_VERSION = 3;
+const LATEST_SCHEMA_VERSION = 4;
 
 let databasePromise: Promise<SQLite.SQLiteDatabase> | undefined;
 
@@ -108,6 +108,28 @@ async function applyMigration(
 
         CREATE INDEX IF NOT EXISTS products_normalized_name_idx
           ON products(normalized_name);
+      `);
+    }
+
+    if (version === 4) {
+      await transaction.execAsync(`
+        ALTER TABLE transactions ADD COLUMN merchant_name TEXT;
+        ALTER TABLE transaction_items ADD COLUMN product_name TEXT;
+
+        UPDATE transactions
+        SET merchant_name = (
+          SELECT merchants.name
+          FROM merchants
+          WHERE merchants.id = transactions.merchant_id
+        )
+        WHERE merchant_id IS NOT NULL;
+
+        UPDATE transaction_items
+        SET product_name = (
+          SELECT products.name
+          FROM products
+          WHERE products.id = transaction_items.product_id
+        );
       `);
     }
 

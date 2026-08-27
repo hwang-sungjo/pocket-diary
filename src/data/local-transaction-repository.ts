@@ -1,8 +1,11 @@
 import type { TransactionRepository } from '@/data/transaction-repository';
 import { getWebDatabase } from '@/data/web-database';
+import { normalizeLookupValue } from '@/domain/autocomplete';
 import {
   assertValidTransactionAggregate,
+  type Transaction,
   type TransactionAggregate,
+  type TransactionItem,
 } from '@/domain/transaction';
 
 class IndexedDbTransactionRepository implements TransactionRepository {
@@ -10,19 +13,43 @@ class IndexedDbTransactionRepository implements TransactionRepository {
     assertValidTransactionAggregate(aggregate);
     const database = await getWebDatabase();
     const databaseTransaction = database.transaction(
-      ['transactions', 'transactionItems'],
+      ['transactions', 'transactionItems', 'merchants', 'products'],
       'readwrite',
     );
     const transactions = databaseTransaction.objectStore('transactions');
     const items = databaseTransaction.objectStore('transactionItems');
+    const merchants = databaseTransaction.objectStore('merchants');
+    const products = databaseTransaction.objectStore('products');
     const oldItemKeys = await items
       .index('by-transaction-id')
       .getAllKeys(aggregate.transaction.id);
 
+    if (aggregate.transaction.merchantId && aggregate.transaction.merchantName) {
+      await merchants.put({
+        id: aggregate.transaction.merchantId,
+        name: aggregate.transaction.merchantName,
+        normalizedName: normalizeLookupValue(aggregate.transaction.merchantName),
+        createdAt: aggregate.transaction.createdAt,
+        updatedAt: aggregate.transaction.updatedAt,
+      });
+    }
+
     await transactions.put(aggregate.transaction);
 
     await Promise.all(oldItemKeys.map((key) => items.delete(key)));
-    await Promise.all(aggregate.items.map((item) => items.put(item)));
+    await Promise.all(
+      aggregate.items.map(async (item) => {
+        await products.put({
+          id: item.productId,
+          name: item.productName,
+          normalizedName: normalizeLookupValue(item.productName),
+          specification: item.specification,
+          createdAt: aggregate.transaction.createdAt,
+          updatedAt: aggregate.transaction.updatedAt,
+        });
+        await items.put(item);
+      }),
+    );
     await databaseTransaction.done;
   }
 
@@ -32,19 +59,28 @@ class IndexedDbTransactionRepository implements TransactionRepository {
       ['transactions', 'transactionItems'],
       'readonly',
     );
-    const transaction = await databaseTransaction
+    const storedTransaction = await databaseTransaction
       .objectStore('transactions')
       .get(id);
 
-    if (transaction === undefined) {
+    if (storedTransaction === undefined) {
       return null;
     }
 
-    const items = await databaseTransaction
+    const storedItems = await databaseTransaction
       .objectStore('transactionItems')
       .index('by-transaction-id')
       .getAll(id);
     await databaseTransaction.done;
+
+    const transaction: Transaction = {
+      ...storedTransaction,
+      merchantName: storedTransaction.merchantName ?? null,
+    };
+    const items: TransactionItem[] = storedItems.map((item) => ({
+      ...item,
+      productName: item.productName ?? '',
+    }));
 
     return { transaction, items };
   }

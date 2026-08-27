@@ -3,21 +3,51 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import { DEFAULT_CATEGORIES, type Category, type CategoryType } from '@/domain/category';
 import type { Transaction, TransactionItem } from '@/domain/transaction';
 
+export interface MerchantRecord {
+  id: string;
+  name: string;
+  normalizedName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductRecord extends MerchantRecord {
+  specification: string | null;
+}
+
+export type StoredTransaction = Omit<Transaction, 'merchantName'> & {
+  merchantName?: string | null;
+};
+
+export type StoredTransactionItem = Omit<TransactionItem, 'productName'> & {
+  productName?: string;
+};
+
 export interface PocketDiaryDatabase extends DBSchema {
   transactions: {
     key: string;
-    value: Transaction;
+    value: StoredTransaction;
     indexes: { 'by-occurred-at': string };
   };
   transactionItems: {
     key: string;
-    value: TransactionItem;
+    value: StoredTransactionItem;
     indexes: { 'by-transaction-id': string };
   };
   categories: {
     key: string;
     value: Category;
     indexes: { 'by-type': CategoryType };
+  };
+  merchants: {
+    key: string;
+    value: MerchantRecord;
+    indexes: { 'by-normalized-name': string };
+  };
+  products: {
+    key: string;
+    value: ProductRecord;
+    indexes: { 'by-normalized-name': string };
   };
 }
 
@@ -28,7 +58,7 @@ export function getWebDatabase(): Promise<IDBPDatabase<PocketDiaryDatabase>> {
     throw new Error('이 브라우저에서는 IndexedDB를 사용할 수 없습니다.');
   }
 
-  databasePromise ??= openDB<PocketDiaryDatabase>('pocket-diary', 2, {
+  databasePromise ??= openDB<PocketDiaryDatabase>('pocket-diary', 3, {
     upgrade(database, oldVersion, _newVersion, transaction) {
       if (oldVersion < 1) {
         const transactions = database.createObjectStore('transactions', {
@@ -51,6 +81,18 @@ export function getWebDatabase(): Promise<IDBPDatabase<PocketDiaryDatabase>> {
         for (const category of DEFAULT_CATEGORIES) {
           void transaction.objectStore('categories').put(category);
         }
+      }
+
+      if (oldVersion < 3) {
+        const merchants = database.createObjectStore('merchants', {
+          keyPath: 'id',
+        });
+        merchants.createIndex('by-normalized-name', 'normalizedName');
+
+        const products = database.createObjectStore('products', {
+          keyPath: 'id',
+        });
+        products.createIndex('by-normalized-name', 'normalizedName');
       }
     },
   });

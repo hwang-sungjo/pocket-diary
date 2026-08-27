@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 
 import { DEFAULT_CATEGORIES } from '@/domain/category';
 
-const LATEST_SCHEMA_VERSION = 2;
+const LATEST_SCHEMA_VERSION = 3;
 
 let databasePromise: Promise<SQLite.SQLiteDatabase> | undefined;
 
@@ -82,6 +82,33 @@ async function applyMigration(
           category.deletedAt,
         );
       }
+    }
+
+    if (version === 3) {
+      await transaction.execAsync(`
+        CREATE TABLE IF NOT EXISTS merchants (
+          id TEXT PRIMARY KEY NOT NULL,
+          name TEXT NOT NULL,
+          normalized_name TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS merchants_normalized_name_idx
+          ON merchants(normalized_name);
+
+        CREATE TABLE IF NOT EXISTS products (
+          id TEXT PRIMARY KEY NOT NULL,
+          name TEXT NOT NULL,
+          normalized_name TEXT NOT NULL,
+          specification TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS products_normalized_name_idx
+          ON products(normalized_name);
+      `);
     }
 
     await transaction.execAsync(`PRAGMA user_version = ${version};`);

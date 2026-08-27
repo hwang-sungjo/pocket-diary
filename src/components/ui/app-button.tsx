@@ -9,7 +9,7 @@ import {
 
 import { colors } from '@/constants/theme';
 
-type AppButtonVariant = 'primary' | 'secondary';
+type AppButtonVariant = 'primary' | 'secondary' | 'danger';
 
 interface AppButtonProps extends Omit<PressableProps, 'children'> {
   children: ReactNode;
@@ -33,7 +33,11 @@ export function AppButton({
       disabled={isDisabled}
       style={(state) => [
         styles.button,
-        variant === 'primary' ? styles.primary : styles.secondary,
+        variant === 'primary'
+          ? styles.primary
+          : variant === 'danger'
+            ? styles.danger
+            : styles.secondary,
         state.pressed && styles.pressed,
         isDisabled && styles.disabled,
         typeof style === 'function' ? style(state) : style,
@@ -42,12 +46,24 @@ export function AppButton({
     >
       {loading ? (
         <ActivityIndicator
-          color={variant === 'primary' ? colors.white : colors.primary}
+          color={
+            variant === 'primary'
+              ? colors.white
+              : variant === 'danger'
+                ? colors.danger
+                : colors.primary
+          }
           size="small"
         />
       ) : (
         <Text
-          style={variant === 'primary' ? styles.primaryText : styles.secondaryText}
+          style={
+            variant === 'primary'
+              ? styles.primaryText
+              : variant === 'danger'
+                ? styles.dangerText
+                : styles.secondaryText
+          }
         >
           {children}
         </Text>
@@ -74,6 +90,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderColor: colors.primary,
   },
+  danger: {
+    backgroundColor: colors.surface,
+    borderColor: colors.danger,
+  },
   primaryText: {
     color: colors.white,
     fontSize: 15,
@@ -81,6 +101,11 @@ const styles = StyleSheet.create({
   },
   secondaryText: {
     color: colors.primary,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  dangerText: {
+    color: colors.danger,
     fontSize: 15,
     fontWeight: '700',
   },

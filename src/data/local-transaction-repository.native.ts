@@ -1,5 +1,6 @@
 import { getNativeDatabase } from '@/data/native-database';
 import type { TransactionRepository } from '@/data/transaction-repository';
+import { normalizeLookupValue } from '@/domain/autocomplete';
 import {
   assertValidTransactionAggregate,
   type Transaction,
@@ -16,6 +17,7 @@ interface TransactionRow {
   occurred_at: string;
   category_id: string;
   merchant_id: string | null;
+  merchant_name: string | null;
   payment_method: string | null;
   memo: string | null;
   created_at: string;
@@ -26,6 +28,7 @@ interface TransactionItemRow {
   id: string;
   transaction_id: string;
   product_id: string;
+  product_name: string;
   category_id: string | null;
   quantity: number;
   unit_price: number | null;
@@ -43,6 +46,7 @@ function toTransaction(row: TransactionRow): Transaction {
     occurredAt: row.occurred_at,
     categoryId: row.category_id,
     merchantId: row.merchant_id,
+    merchantName: row.merchant_name,
     paymentMethod: row.payment_method,
     memo: row.memo,
     createdAt: row.created_at,
@@ -55,6 +59,7 @@ function toTransactionItem(row: TransactionItemRow): TransactionItem {
     id: row.id,
     transactionId: row.transaction_id,
     productId: row.product_id,
+    productName: row.product_name,
     categoryId: row.category_id,
     quantity: row.quantity,
     unitPrice: row.unit_price,
@@ -71,6 +76,23 @@ class SQLiteTransactionRepository implements TransactionRepository {
     const transaction = aggregate.transaction;
 
     await database.withTransactionAsync(async () => {
+      if (transaction.merchantId && transaction.merchantName) {
+        await database.runAsync(
+          `INSERT INTO merchants (
+            id, name, normalized_name, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            name = excluded.name,
+            normalized_name = excluded.normalized_name,
+            updated_at = excluded.updated_at`,
+          transaction.merchantId,
+          transaction.merchantName,
+          normalizeLookupValue(transaction.merchantName),
+          transaction.createdAt,
+          transaction.updatedAt,
+        );
+      }
+
       await database.runAsync(
         `INSERT INTO transactions (
           id, type, name, total_amount, occurred_at, category_id, merchant_id,
@@ -106,6 +128,23 @@ class SQLiteTransactionRepository implements TransactionRepository {
 
       for (const item of aggregate.items) {
         await database.runAsync(
+          `INSERT INTO products (
+            id, name, normalized_name, specification, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            name = excluded.name,
+            normalized_name = excluded.normalized_name,
+            specification = excluded.specification,
+            updated_at = excluded.updated_at`,
+          item.productId,
+          item.productName,
+          normalizeLookupValue(item.productName),
+          item.specification,
+          transaction.createdAt,
+          transaction.updatedAt,
+        );
+
+        await database.runAsync(
           `INSERT INTO transaction_items (
             id, transaction_id, product_id, category_id, quantity, unit_price,
             total_price, specification, memo
@@ -127,7 +166,10 @@ class SQLiteTransactionRepository implements TransactionRepository {
   async findById(id: string): Promise<TransactionAggregate | null> {
     const database = await getNativeDatabase();
     const row = await database.getFirstAsync<TransactionRow>(
-      'SELECT * FROM transactions WHERE id = ?',
+      `SELECT transactions.*, merchants.name AS merchant_name
+       FROM transactions
+       LEFT JOIN merchants ON merchants.id = transactions.merchant_id
+       WHERE transactions.id = ?`,
       id,
     );
 
@@ -136,7 +178,11 @@ class SQLiteTransactionRepository implements TransactionRepository {
     }
 
     const itemRows = await database.getAllAsync<TransactionItemRow>(
-      'SELECT * FROM transaction_items WHERE transaction_id = ? ORDER BY rowid',
+      `SELECT transaction_items.*, products.name AS product_name
+       FROM transaction_items
+       LEFT JOIN products ON products.id = transaction_items.product_id
+       WHERE transaction_items.transaction_id = ?
+       ORDER BY transaction_items.rowid`,
       id,
     );
 
@@ -149,7 +195,10 @@ class SQLiteTransactionRepository implements TransactionRepository {
   async list(): Promise<TransactionAggregate[]> {
     const database = await getNativeDatabase();
     const rows = await database.getAllAsync<TransactionRow>(
-      'SELECT * FROM transactions ORDER BY occurred_at DESC',
+      `SELECT transactions.*, merchants.name AS merchant_name
+       FROM transactions
+       LEFT JOIN merchants ON merchants.id = transactions.merchant_id
+       ORDER BY occurred_at DESC`,
     );
 
     return Promise.all(rows.map(({ id }) => this.findById(id))).then(

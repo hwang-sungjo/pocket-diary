@@ -1,5 +1,4 @@
-import * as SQLite from 'expo-sqlite';
-
+import { getNativeDatabase } from '@/data/native-database';
 import type { TransactionRepository } from '@/data/transaction-repository';
 import {
   assertValidTransactionAggregate,
@@ -35,52 +34,6 @@ interface TransactionItemRow {
   memo: string | null;
 }
 
-let databasePromise: Promise<SQLite.SQLiteDatabase> | undefined;
-
-async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
-  databasePromise ??= SQLite.openDatabaseAsync('pocket-diary.db').then(
-    async (database) => {
-      await database.execAsync(`
-        PRAGMA foreign_keys = ON;
-
-        CREATE TABLE IF NOT EXISTS transactions (
-          id TEXT PRIMARY KEY NOT NULL,
-          type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
-          name TEXT NOT NULL,
-          total_amount INTEGER NOT NULL CHECK (total_amount > 0),
-          occurred_at TEXT NOT NULL,
-          category_id TEXT NOT NULL,
-          merchant_id TEXT,
-          payment_method TEXT,
-          memo TEXT,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS transaction_items (
-          id TEXT PRIMARY KEY NOT NULL,
-          transaction_id TEXT NOT NULL,
-          product_id TEXT NOT NULL,
-          category_id TEXT,
-          quantity REAL NOT NULL DEFAULT 1,
-          unit_price INTEGER,
-          total_price INTEGER NOT NULL,
-          specification TEXT,
-          memo TEXT,
-          FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE
-        );
-
-        CREATE INDEX IF NOT EXISTS transaction_items_transaction_id_idx
-          ON transaction_items(transaction_id);
-      `);
-
-      return database;
-    },
-  );
-
-  return databasePromise;
-}
-
 function toTransaction(row: TransactionRow): Transaction {
   return {
     id: row.id,
@@ -114,7 +67,7 @@ function toTransactionItem(row: TransactionItemRow): TransactionItem {
 class SQLiteTransactionRepository implements TransactionRepository {
   async save(aggregate: TransactionAggregate): Promise<void> {
     assertValidTransactionAggregate(aggregate);
-    const database = await getDatabase();
+    const database = await getNativeDatabase();
     const transaction = aggregate.transaction;
 
     await database.withTransactionAsync(async () => {
@@ -172,7 +125,7 @@ class SQLiteTransactionRepository implements TransactionRepository {
   }
 
   async findById(id: string): Promise<TransactionAggregate | null> {
-    const database = await getDatabase();
+    const database = await getNativeDatabase();
     const row = await database.getFirstAsync<TransactionRow>(
       'SELECT * FROM transactions WHERE id = ?',
       id,
@@ -194,7 +147,7 @@ class SQLiteTransactionRepository implements TransactionRepository {
   }
 
   async list(): Promise<TransactionAggregate[]> {
-    const database = await getDatabase();
+    const database = await getNativeDatabase();
     const rows = await database.getAllAsync<TransactionRow>(
       'SELECT * FROM transactions ORDER BY occurred_at DESC',
     );
@@ -210,4 +163,3 @@ class SQLiteTransactionRepository implements TransactionRepository {
 
 export const localTransactionRepository: TransactionRepository =
   new SQLiteTransactionRepository();
-

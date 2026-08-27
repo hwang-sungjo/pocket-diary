@@ -34,7 +34,7 @@ export interface TransactionAggregate {
 export const DAY_ONE_TEST_TRANSACTION_ID =
   '0198d66a-0b80-7000-8000-000000000001';
 
-const DAY_ONE_CATEGORY_ID = '0198d66a-0b80-7000-8000-000000000002';
+const DAY_ONE_CATEGORY_ID = '0198d66a-0b81-7000-8000-000000000001';
 
 export function createDayOneTestTransaction(
   now = new Date(),
@@ -86,4 +86,3 @@ export function assertValidTransactionAggregate(
     }
   }
 }
-

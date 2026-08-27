@@ -363,13 +363,21 @@ Pocket Diary 가계부
 | `transactions` | 결제 또는 수입 | `type`, `name`, `total_amount`, `occurred_at`, `category_id`, `merchant_id` |
 | `transaction_items` | 상세 품목 | `transaction_id`, `product_id`, `quantity`, `unit_price`, `total_price`, `category_id` |
 | `products` | 제품 자동완성과 분석 | `name`, `normalized_name`, `specification` |
-| `categories` | 기본·사용자 카테고리 | `type`, `name`, `is_default`, `is_active` |
+| `categories` | 기본·사용자 카테고리 | `type`, `name`, `sort_order`, `is_default`, `is_active`, `created_at`, `updated_at`, `deleted_at` |
 | `merchants` | 상점 또는 수입처 | `name`, `normalized_name`, `location_id` |
 | `locations` | 위치 | `address`, `latitude`, `longitude`, `place_id` |
 | `recurring_rules` | 반복 규칙 | `frequency`, `interval`, `next_run_at`, `requires_confirmation` |
 | `receipt_images` | 영수증 이미지 | `transaction_id`, `storage_path`, `ocr_status` |
 | `sheet_integrations` | Sheets 연결 | `spreadsheet_id`, `last_synced_at`, `status` |
 | `sync_jobs` | 동기화 이력 | `provider`, `status`, `error_message`, `started_at` |
+
+### P0 로컬 스키마 결정
+
+- Web IndexedDB와 iPhone SQLite는 같은 도메인 모델과 Repository 계약을 사용한다.
+- 로컬 스키마는 버전형 전진 마이그레이션으로 관리한다. v1은 `transactions`와 `transaction_items`, v2는 `categories`와 기본 카테고리 시드다.
+- 기본 카테고리 18개는 플랫폼 간 동일한 고정 UUID와 유형별 `sort_order`를 사용한다.
+- P0 로컬 모드는 단일 사용자이므로 로컬 테이블에 `user_id`를 저장하지 않는다. 계정 동기화를 도입하는 P1 마이그레이션에서 소유자 연결을 추가한다.
+- 사용자가 숨긴 카테고리를 재시드 과정에서 다시 활성화하지 않는다. 사용 중인 카테고리는 물리 삭제 대신 `is_active`와 `deleted_at`으로 비활성화한다.
 
 ### 관계
 
@@ -579,6 +587,7 @@ Codex는 구현 작업 전에 이 문서를 읽고 다음 원칙을 지킨다.
 - [ ] 제품명을 사용자가 직접 병합할 수 있게 할지
 - [ ] 반복 거래 생성 시점과 알림 정책
 - [x] P0 로컬 DB 및 동기화 기술 검증 결과 — UI와 저장소 사이에 `TransactionRepository`를 두고 iPhone은 `expo-sqlite`, Web은 브라우저 IndexedDB 어댑터를 사용한다. Expo SQLite Web은 alpha이며 별도 WASM·보안 헤더 구성이 필요하고, PowerSync의 React Native Web 지원은 beta이므로 P0에는 도입하지 않는다. P0는 로컬 데이터를 원본으로 유지하고 실제 원격 동기화는 계정·Supabase 구성이 필요한 P1에서 Repository 뒤에 추가한다. (2026-08-24)
+- [x] P0 로컬 스키마 버전과 기본 카테고리 식별자 — Web IndexedDB와 iPhone SQLite 모두 v1 거래·품목, v2 카테고리 순서로 전진 마이그레이션한다. 기본 카테고리 18개는 플랫폼 간 같은 고정 UUID를 사용하고, P0 단일 사용자 로컬 테이블에는 `user_id`를 두지 않는다. (2026-08-27)
 - [ ] Google Sheets 월별 탭의 실제 레이아웃
 
 ## 18. 참고 문서

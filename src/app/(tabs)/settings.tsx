@@ -1,3 +1,4 @@
+import { CategoryListCard } from '@/components/category-list-card';
 import { PlaceholderCard } from '@/components/placeholder-card';
 import { Screen } from '@/components/screen';
 
@@ -8,7 +9,7 @@ export default function SettingsScreen() {
         P0는 로그인 없이 사용할 수 있습니다. 계정과 클라우드 동기화는 P1에서 별도로
         연결합니다.
       </PlaceholderCard>
+      <CategoryListCard />
     </Screen>
   );
 }
-

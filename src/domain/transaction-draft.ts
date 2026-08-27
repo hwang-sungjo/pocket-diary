@@ -67,6 +67,36 @@ export function createTransactionDraft(now = new Date()): TransactionDraft {
   };
 }
 
+export function createTransactionDraftFromAggregate(
+  aggregate: TransactionAggregate,
+): TransactionDraft {
+  const occurredAt = new Date(aggregate.transaction.occurredAt);
+
+  return {
+    type: aggregate.transaction.type,
+    name: aggregate.transaction.name,
+    totalAmount: aggregate.transaction.totalAmount,
+    date: formatLocalDate(occurredAt),
+    time: formatLocalTime(occurredAt),
+    categoryId: aggregate.transaction.categoryId,
+    merchantId: aggregate.transaction.merchantId,
+    merchantName: aggregate.transaction.merchantName ?? '',
+    paymentMethod: aggregate.transaction.paymentMethod,
+    memo: aggregate.transaction.memo ?? '',
+    items: aggregate.items.map((item) => ({
+      id: item.id,
+      productId: item.productId,
+      productName: item.productName,
+      categoryId: item.categoryId,
+      quantity: String(item.quantity),
+      unitPrice: item.unitPrice,
+      totalPrice: item.totalPrice,
+      specification: item.specification ?? '',
+      memo: item.memo ?? '',
+    })),
+  };
+}
+
 export function createTransactionItemDraft(
   id: string,
   productId: string,
@@ -156,6 +186,7 @@ export function buildTransactionAggregate(
   draft: TransactionDraft,
   transactionId: string,
   now = new Date(),
+  existingAggregate?: TransactionAggregate,
 ): TransactionAggregate {
   const errors = getTransactionDraftErrors(draft);
 
@@ -178,7 +209,7 @@ export function buildTransactionAggregate(
       merchantName: merchantName || null,
       paymentMethod: draft.paymentMethod,
       memo: draft.memo.trim() || null,
-      createdAt: timestamp,
+      createdAt: existingAggregate?.transaction.createdAt ?? timestamp,
       updatedAt: timestamp,
     },
     items: draft.items.map((item) => ({

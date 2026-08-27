@@ -29,13 +29,17 @@ import {
   calculateDraftItemTotal,
   calculateDraftUnclassifiedAmount,
   createTransactionDraft,
+  createTransactionDraftFromAggregate,
   createTransactionItemDraft,
   getTransactionDraftErrors,
   isValidTime,
   type TransactionDraft,
   type TransactionItemDraft,
 } from '@/domain/transaction-draft';
-import type { TransactionType } from '@/domain/transaction';
+import type {
+  TransactionAggregate,
+  TransactionType,
+} from '@/domain/transaction';
 
 const EMPTY_SUGGESTIONS: AutocompleteSuggestions = {
   transactionNames: [],
@@ -56,7 +60,11 @@ const PAYMENT_METHODS = [
   { label: '기타', value: 'other' },
 ] as const;
 
-export function TransactionForm() {
+interface TransactionFormProps {
+  transactionId?: string;
+}
+
+export function TransactionForm({ transactionId }: TransactionFormProps) {
   const [draft, setDraft] = useState<TransactionDraft>(() =>
     createTransactionDraft(),
   );
@@ -68,6 +76,8 @@ export function TransactionForm() {
   const [submitted, setSubmitted] = useState(false);
   const [overageConfirmed, setOverageConfirmed] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [existingAggregate, setExistingAggregate] =
+    useState<TransactionAggregate | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -75,21 +85,32 @@ export function TransactionForm() {
     Promise.all([
       localCategoryRepository.list(),
       localTransactionRepository.list(),
+      transactionId
+        ? localTransactionRepository.findById(transactionId)
+        : Promise.resolve(null),
     ]).then(
-      ([nextCategories, aggregates]) => {
+      ([nextCategories, aggregates, aggregateToEdit]) => {
         if (!active) {
           return;
         }
 
         setCategories(nextCategories);
         setSuggestions(buildAutocompleteSuggestions(aggregates));
-        setDraft((current) => ({
-          ...current,
-          categoryId:
-            current.categoryId ||
-            nextCategories.find(({ type }) => type === current.type)?.id ||
-            '',
-        }));
+        setExistingAggregate(aggregateToEdit);
+
+        if (transactionId && !aggregateToEdit) {
+          setFormError('수정할 거래를 찾지 못했습니다.');
+        } else if (aggregateToEdit) {
+          setDraft(createTransactionDraftFromAggregate(aggregateToEdit));
+        } else {
+          setDraft((current) => ({
+            ...current,
+            categoryId:
+              current.categoryId ||
+              nextCategories.find(({ type }) => type === current.type)?.id ||
+              '',
+          }));
+        }
         setLoadingData(false);
       },
       (cause: unknown) => {
@@ -107,7 +128,7 @@ export function TransactionForm() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [transactionId]);
 
   const visibleCategories = useMemo(
     () => categories.filter(({ type }) => type === draft.type),
@@ -185,16 +206,24 @@ export function TransactionForm() {
 
     setSaving(true);
     try {
-      const transactionId = randomUUID();
-      const aggregate = buildTransactionAggregate(draft, transactionId);
+      const savedTransactionId = transactionId ?? randomUUID();
+      const aggregate = buildTransactionAggregate(
+        draft,
+        savedTransactionId,
+        new Date(),
+        existingAggregate ?? undefined,
+      );
       await localTransactionRepository.save(aggregate);
 
-      const saved = await localTransactionRepository.findById(transactionId);
+      const saved = await localTransactionRepository.findById(savedTransactionId);
       if (!saved || saved.items.length !== aggregate.items.length) {
         throw new Error('저장한 거래와 상세 품목을 다시 조회하지 못했습니다.');
       }
 
-      router.replace({ pathname: '/transactions/[id]', params: { id: transactionId } });
+      router.replace({
+        pathname: '/transactions/[id]',
+        params: { id: savedTransactionId },
+      });
     } catch (cause) {
       setFormError(
         cause instanceof Error
@@ -445,7 +474,7 @@ export function TransactionForm() {
         onPress={() => void saveTransaction()}
         testID="save-transaction"
       >
-        거래 저장
+        {transactionId ? '변경 저장' : '거래 저장'}
       </AppButton>
     </View>
   );

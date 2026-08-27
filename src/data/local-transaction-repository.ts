@@ -100,6 +100,20 @@ class IndexedDbTransactionRepository implements TransactionRepository {
         right.transaction.occurredAt.localeCompare(left.transaction.occurredAt),
       );
   }
+
+  async delete(id: string): Promise<void> {
+    const database = await getWebDatabase();
+    const databaseTransaction = database.transaction(
+      ['transactions', 'transactionItems'],
+      'readwrite',
+    );
+    const items = databaseTransaction.objectStore('transactionItems');
+    const itemKeys = await items.index('by-transaction-id').getAllKeys(id);
+
+    await Promise.all(itemKeys.map((key) => items.delete(key)));
+    await databaseTransaction.objectStore('transactions').delete(id);
+    await databaseTransaction.done;
+  }
 }
 
 export const localTransactionRepository: TransactionRepository =

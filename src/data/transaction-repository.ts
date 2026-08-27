@@ -4,5 +4,5 @@ export interface TransactionRepository {
   save(aggregate: TransactionAggregate): Promise<void>;
   findById(id: string): Promise<TransactionAggregate | null>;
   list(): Promise<TransactionAggregate[]>;
+  delete(id: string): Promise<void>;
 }
-

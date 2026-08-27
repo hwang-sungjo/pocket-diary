@@ -6,6 +6,7 @@ import {
   calculateDraftItemTotal,
   calculateDraftUnclassifiedAmount,
   createTransactionDraft,
+  createTransactionDraftFromAggregate,
   createTransactionItemDraft,
   getTransactionDraftErrors,
   isValidTime,
@@ -61,4 +62,32 @@ test('실제로 존재하는 24시간제 시각만 허용한다', () => {
   assert.equal(isValidTime('23:59'), true);
   assert.equal(isValidTime('24:00'), false);
   assert.equal(isValidTime('9:30'), false);
+});
+
+test('저장된 거래를 draft로 변환해 수정해도 ID와 생성 시각을 보존한다', () => {
+  const originalDraft = createTransactionDraft(
+    new Date('2026-08-27T12:00:00'),
+  );
+  originalDraft.name = '수정 전';
+  originalDraft.totalAmount = 10000;
+  originalDraft.categoryId = '0198d66a-0b81-7000-8000-000000000001';
+  const original = buildTransactionAggregate(
+    originalDraft,
+    '0198d66a-0b83-4000-8000-000000000010',
+    new Date('2026-08-27T03:00:00Z'),
+  );
+
+  const editDraft = createTransactionDraftFromAggregate(original);
+  editDraft.name = '수정 후';
+  const updated = buildTransactionAggregate(
+    editDraft,
+    original.transaction.id,
+    new Date('2026-08-27T04:00:00Z'),
+    original,
+  );
+
+  assert.equal(updated.transaction.id, original.transaction.id);
+  assert.equal(updated.transaction.createdAt, original.transaction.createdAt);
+  assert.equal(updated.transaction.updatedAt, '2026-08-27T04:00:00.000Z');
+  assert.equal(updated.transaction.name, '수정 후');
 });

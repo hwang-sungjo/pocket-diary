@@ -33,6 +33,9 @@ export default function TransactionDetailScreen() {
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const [state, setState] = useState<DetailState>({ status: 'loading' });
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -76,6 +79,29 @@ export default function TransactionDetailScreen() {
     };
   }, [id]);
 
+  async function deleteTransaction() {
+    if (!id) {
+      return;
+    }
+
+    setDeleting(true);
+    setDeleteError(null);
+
+    try {
+      await localTransactionRepository.delete(id);
+      const deleted = await localTransactionRepository.findById(id);
+      if (deleted) {
+        throw new Error('삭제한 거래가 로컬 저장소에 남아 있습니다.');
+      }
+      router.replace('/transactions');
+    } catch (cause) {
+      setDeleteError(
+        cause instanceof Error ? cause.message : '거래를 삭제하지 못했습니다.',
+      );
+      setDeleting(false);
+    }
+  }
+
   return (
     <Screen
       action={
@@ -103,10 +129,65 @@ export default function TransactionDetailScreen() {
       ) : null}
 
       {state.status === 'success' ? (
-        <TransactionDetail
-          aggregate={state.aggregate}
-          categories={state.categories}
-        />
+        <View style={styles.content}>
+          <TransactionDetail
+            aggregate={state.aggregate}
+            categories={state.categories}
+          />
+          <View style={sharedStyles.card}>
+            <Text style={sharedStyles.cardTitle}>거래 관리</Text>
+            <View style={styles.actions}>
+              <AppButton
+                onPress={() =>
+                  router.push({
+                    pathname: '/transactions/[id]/edit',
+                    params: { id: state.aggregate.transaction.id },
+                  })
+                }
+                testID="edit-transaction"
+                variant="secondary"
+              >
+                거래 수정
+              </AppButton>
+              <AppButton
+                onPress={() => setConfirmingDelete(true)}
+                testID="delete-transaction"
+                variant="danger"
+              >
+                거래 삭제
+              </AppButton>
+            </View>
+
+            {confirmingDelete ? (
+              <View style={styles.deleteWarning} testID="delete-confirmation">
+                <Text style={styles.deleteTitle}>
+                  거래와 연결된 상세 품목을 모두 삭제할까요?
+                </Text>
+                <Text style={styles.deleteDescription}>
+                  P0 로컬 모드에서는 삭제 후 되돌릴 수 없습니다.
+                </Text>
+                <View style={styles.actions}>
+                  <AppButton
+                    disabled={deleting}
+                    onPress={() => setConfirmingDelete(false)}
+                    variant="secondary"
+                  >
+                    취소
+                  </AppButton>
+                  <AppButton
+                    loading={deleting}
+                    onPress={() => void deleteTransaction()}
+                    testID="confirm-delete-transaction"
+                    variant="danger"
+                  >
+                    삭제 확인
+                  </AppButton>
+                </View>
+              </View>
+            ) : null}
+            {deleteError ? <Text style={styles.error}>{deleteError}</Text> : null}
+          </View>
+        </View>
       ) : null}
     </Screen>
   );
@@ -127,7 +208,7 @@ function TransactionDetail({
   const unclassifiedAmount = calculateUnclassifiedAmount(aggregate);
 
   return (
-    <View style={styles.content} testID="saved-transaction-detail">
+    <View style={styles.detailContent} testID="saved-transaction-detail">
       <View style={sharedStyles.card}>
         <View style={styles.detailHeading}>
           <View style={styles.headingText}>
@@ -226,6 +307,9 @@ const styles = StyleSheet.create({
   content: {
     gap: 20,
   },
+  detailContent: {
+    gap: 20,
+  },
   error: {
     color: colors.danger,
     fontSize: 14,
@@ -317,5 +401,26 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 4,
     padding: 12,
+  },
+  actions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  deleteWarning: {
+    backgroundColor: '#FEE4E2',
+    borderRadius: 12,
+    gap: 8,
+    padding: 14,
+  },
+  deleteTitle: {
+    color: colors.danger,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  deleteDescription: {
+    color: colors.text,
+    fontSize: 13,
+    lineHeight: 19,
   },
 });

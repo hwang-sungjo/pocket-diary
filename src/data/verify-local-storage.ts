@@ -15,6 +15,18 @@ export async function verifyLocalStorage(
 
   if (!existingTransaction) {
     await repository.save(testTransaction);
+  } else if (
+    existingTransaction.transaction.categoryId !==
+    testTransaction.transaction.categoryId
+  ) {
+    await repository.save({
+      transaction: {
+        ...existingTransaction.transaction,
+        categoryId: testTransaction.transaction.categoryId,
+        updatedAt: testTransaction.transaction.updatedAt,
+      },
+      items: existingTransaction.items,
+    });
   }
 
   const savedTransaction = await repository.findById(DAY_ONE_TEST_TRANSACTION_ID);

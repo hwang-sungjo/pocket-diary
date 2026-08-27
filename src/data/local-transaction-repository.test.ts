@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import 'fake-indexeddb/auto';
 
 import { localTransactionRepository } from '@/data/local-transaction-repository';
+import { verifyLocalStorage } from '@/data/verify-local-storage';
 import {
   buildTransactionAggregate,
   createTransactionDraft,
@@ -76,4 +77,58 @@ test('상점과 상세 품목이 있는 거래를 저장하고 다시 조회한�
     await localTransactionRepository.findById(aggregate.transaction.id),
     aggregate,
   );
+});
+
+test('거래를 수정하면 같은 ID로 교체되고 삭제하면 품목과 함께 조회되지 않는다', async () => {
+  const transactionId = '0198d66a-0b83-4000-8000-000000000001';
+  const fixture = createDayOneTestTransaction(
+    new Date('2026-08-27T13:00:00Z'),
+  );
+  fixture.transaction.id = transactionId;
+  fixture.transaction.name = '수정 전 거래';
+  fixture.transaction.totalAmount = 10000;
+  fixture.items = [
+    {
+      id: '0198d66a-0b83-4000-8000-000000000002',
+      transactionId,
+      productId: '0198d66a-0b83-4000-8000-000000000003',
+      productName: '수정 테스트 품목',
+      categoryId: null,
+      quantity: 1,
+      unitPrice: 10000,
+      totalPrice: 10000,
+      specification: null,
+      memo: null,
+    },
+  ];
+
+  await localTransactionRepository.save(fixture);
+  fixture.transaction.name = '수정된 거래';
+  fixture.transaction.totalAmount = 12000;
+  fixture.items[0]!.totalPrice = 12000;
+  fixture.items[0]!.unitPrice = 12000;
+  await localTransactionRepository.save(fixture);
+
+  const updated = await localTransactionRepository.findById(transactionId);
+  assert.equal(updated?.transaction.name, '수정된 거래');
+  assert.equal(updated?.items[0]?.totalPrice, 12000);
+
+  await localTransactionRepository.delete(transactionId);
+  assert.equal(await localTransactionRepository.findById(transactionId), null);
+});
+
+test('이전 Day 1 테스트 카테고리만 현재 시드 ID로 보정하고 기존 값은 보존한다', async () => {
+  const legacy = createDayOneTestTransaction(
+    new Date('2026-08-24T00:00:00Z'),
+  );
+  legacy.transaction.categoryId = '0198d66a-0b80-7000-8000-000000000002';
+  legacy.transaction.memo = '보존할 메모';
+  await localTransactionRepository.save(legacy);
+
+  const migrated = await verifyLocalStorage(localTransactionRepository);
+  const currentFixture = createDayOneTestTransaction();
+
+  assert.equal(migrated.transaction.categoryId, currentFixture.transaction.categoryId);
+  assert.equal(migrated.transaction.memo, '보존할 메모');
+  assert.equal(migrated.transaction.occurredAt, legacy.transaction.occurredAt);
 });

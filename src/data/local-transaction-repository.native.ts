@@ -208,6 +208,18 @@ class SQLiteTransactionRepository implements TransactionRepository {
         ),
     );
   }
+
+  async delete(id: string): Promise<void> {
+    const database = await getNativeDatabase();
+
+    await database.withTransactionAsync(async () => {
+      await database.runAsync(
+        'DELETE FROM transaction_items WHERE transaction_id = ?',
+        id,
+      );
+      await database.runAsync('DELETE FROM transactions WHERE id = ?', id);
+    });
+  }
 }
 
 export const localTransactionRepository: TransactionRepository =

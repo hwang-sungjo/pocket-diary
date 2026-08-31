@@ -47,6 +47,16 @@ test('원화 금액이 정수가 아니면 저장하지 않는다', async () => 
   );
 });
 
+test('안전한 정수 범위를 넘는 원화 금액은 저장하지 않는다', async () => {
+  const fixture = createDayOneTestTransaction();
+  fixture.transaction.totalAmount = Number.MAX_SAFE_INTEGER + 1;
+
+  await assert.rejects(
+    localTransactionRepository.save(fixture),
+    /0보다 큰 정수 원화/,
+  );
+});
+
 test('상점과 상세 품목이 있는 거래를 저장하고 다시 조회한다', async () => {
   const draft = createTransactionDraft(new Date('2026-08-27T12:00:00'));
   draft.name = 'Day 3 장보기';

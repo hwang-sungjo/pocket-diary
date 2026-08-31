@@ -7,6 +7,8 @@ test('원화 금액은 정수로 파싱하고 천 단위 구분자로 표시한�
   assert.equal(parseKRWInput('12,500원'), 12500);
   assert.equal(parseKRWInput(''), null);
   assert.equal(parseKRWInput('abc'), null);
+  assert.equal(parseKRWInput('9,007,199,254,740,991'), Number.MAX_SAFE_INTEGER);
+  assert.equal(parseKRWInput('9,007,199,254,740,992'), null);
   assert.equal(formatKRW(12500), '12,500');
   assert.equal(formatKRW(null), '');
 });

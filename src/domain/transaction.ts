@@ -1,4 +1,7 @@
+import { isValidISODate } from '@/domain/input-values';
+
 export type TransactionType = 'income' | 'expense';
+export type TransactionStatus = 'confirmed' | 'needs_confirmation';
 
 export interface Transaction {
   id: string;
@@ -11,6 +14,9 @@ export interface Transaction {
   merchantName: string | null;
   paymentMethod: string | null;
   memo: string | null;
+  status: TransactionStatus;
+  recurringRuleId: string | null;
+  scheduledDate: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -55,6 +61,9 @@ export function createDayOneTestTransaction(
       merchantName: null,
       paymentMethod: null,
       memo: 'iPhone 및 Web 저장 방식 기술 검증용',
+      status: 'confirmed',
+      recurringRuleId: null,
+      scheduledDate: null,
       createdAt: timestamp,
       updatedAt: timestamp,
     },
@@ -71,8 +80,39 @@ export function assertValidTransactionAggregate(
     throw new Error('거래명은 필수입니다.');
   }
 
-  if (!Number.isInteger(transaction.totalAmount) || transaction.totalAmount <= 0) {
+  if (
+    !Number.isSafeInteger(transaction.totalAmount) ||
+    transaction.totalAmount <= 0
+  ) {
     throw new Error('거래 총액은 0보다 큰 정수 원화여야 합니다.');
+  }
+
+  if (
+    transaction.status !== 'confirmed' &&
+    transaction.status !== 'needs_confirmation'
+  ) {
+    throw new Error('올바르지 않은 거래 상태입니다.');
+  }
+
+  if (
+    (transaction.recurringRuleId === null) !==
+    (transaction.scheduledDate === null)
+  ) {
+    throw new Error('반복 거래의 규칙 ID와 예정일은 함께 저장해야 합니다.');
+  }
+
+  if (
+    transaction.scheduledDate !== null &&
+    !isValidISODate(transaction.scheduledDate)
+  ) {
+    throw new Error('반복 거래 예정일이 올바르지 않습니다.');
+  }
+
+  if (
+    transaction.status === 'needs_confirmation' &&
+    transaction.recurringRuleId === null
+  ) {
+    throw new Error('금액 확인 필요 상태는 반복 거래에만 사용할 수 있습니다.');
   }
 
   for (const item of items) {
@@ -88,13 +128,13 @@ export function assertValidTransactionAggregate(
       throw new Error('품목 수량은 0보다 커야 합니다.');
     }
 
-    if (!Number.isInteger(item.totalPrice) || item.totalPrice <= 0) {
+    if (!Number.isSafeInteger(item.totalPrice) || item.totalPrice <= 0) {
       throw new Error('품목 합계는 0보다 큰 정수 원화여야 합니다.');
     }
 
     if (
       item.unitPrice !== null &&
-      (!Number.isInteger(item.unitPrice) || item.unitPrice <= 0)
+      (!Number.isSafeInteger(item.unitPrice) || item.unitPrice <= 0)
     ) {
       throw new Error('품목 단가는 0보다 큰 정수 원화여야 합니다.');
     }

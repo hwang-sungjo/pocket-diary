@@ -57,6 +57,23 @@ test('필수 거래와 품목 입력을 검증하고 aggregate를 만든다', ()
   assert.equal(aggregate.items[0]?.transactionId, aggregate.transaction.id);
 });
 
+test('안전한 정수 범위를 넘는 금액을 거래와 품목에 허용하지 않는다', () => {
+  const draft = createTransactionDraft(new Date('2026-08-27T12:00:00'));
+  draft.name = '큰 금액';
+  draft.totalAmount = Number.MAX_SAFE_INTEGER + 1;
+  draft.categoryId = '0198d66a-0b81-7000-8000-000000000001';
+
+  assert.match(getTransactionDraftErrors(draft)[0] ?? '', /총금액/);
+
+  draft.totalAmount = Number.MAX_SAFE_INTEGER;
+  const item = createTransactionItemDraft('item', 'product');
+  item.productName = '큰 금액 품목';
+  item.totalPrice = Number.MAX_SAFE_INTEGER + 1;
+  draft.items = [item];
+
+  assert.match(getTransactionDraftErrors(draft)[0] ?? '', /품목 1의 합계/);
+});
+
 test('실제로 존재하는 24시간제 시각만 허용한다', () => {
   assert.equal(isValidTime('00:00'), true);
   assert.equal(isValidTime('23:59'), true);

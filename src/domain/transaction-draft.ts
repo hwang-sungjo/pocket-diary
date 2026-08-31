@@ -137,7 +137,7 @@ export function getTransactionDraftErrors(draft: TransactionDraft): string[] {
 
   if (
     draft.totalAmount === null ||
-    !Number.isInteger(draft.totalAmount) ||
+    !Number.isSafeInteger(draft.totalAmount) ||
     draft.totalAmount <= 0
   ) {
     errors.push('총금액은 0보다 큰 정수 원화로 입력해 주세요.');
@@ -165,7 +165,7 @@ export function getTransactionDraftErrors(draft: TransactionDraft): string[] {
 
     if (
       item.totalPrice === null ||
-      !Number.isInteger(item.totalPrice) ||
+      !Number.isSafeInteger(item.totalPrice) ||
       item.totalPrice <= 0
     ) {
       errors.push(`${label}의 합계는 0보다 큰 정수 원화여야 합니다.`);
@@ -173,7 +173,7 @@ export function getTransactionDraftErrors(draft: TransactionDraft): string[] {
 
     if (
       item.unitPrice !== null &&
-      (!Number.isInteger(item.unitPrice) || item.unitPrice <= 0)
+      (!Number.isSafeInteger(item.unitPrice) || item.unitPrice <= 0)
     ) {
       errors.push(`${label}의 단가는 0보다 큰 정수 원화여야 합니다.`);
     }
@@ -209,6 +209,9 @@ export function buildTransactionAggregate(
       merchantName: merchantName || null,
       paymentMethod: draft.paymentMethod,
       memo: draft.memo.trim() || null,
+      status: 'confirmed',
+      recurringRuleId: existingAggregate?.transaction.recurringRuleId ?? null,
+      scheduledDate: existingAggregate?.transaction.scheduledDate ?? null,
       createdAt: existingAggregate?.transaction.createdAt ?? timestamp,
       updatedAt: timestamp,
     },

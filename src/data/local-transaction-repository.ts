@@ -76,6 +76,9 @@ class IndexedDbTransactionRepository implements TransactionRepository {
     const transaction: Transaction = {
       ...storedTransaction,
       merchantName: storedTransaction.merchantName ?? null,
+      status: storedTransaction.status ?? 'confirmed',
+      recurringRuleId: storedTransaction.recurringRuleId ?? null,
+      scheduledDate: storedTransaction.scheduledDate ?? null,
     };
     const items: TransactionItem[] = storedItems.map((item) => ({
       ...item,
@@ -83,6 +86,21 @@ class IndexedDbTransactionRepository implements TransactionRepository {
     }));
 
     return { transaction, items };
+  }
+
+  async findByRecurringOccurrence(
+    recurringRuleId: string,
+    scheduledDate: string,
+  ): Promise<TransactionAggregate | null> {
+    const database = await getWebDatabase();
+    const storedTransaction = await database.getFromIndex(
+      'transactions',
+      'by-recurring-occurrence',
+      [recurringRuleId, scheduledDate],
+    );
+    return storedTransaction
+      ? this.findById(storedTransaction.id)
+      : null;
   }
 
   async list(): Promise<TransactionAggregate[]> {

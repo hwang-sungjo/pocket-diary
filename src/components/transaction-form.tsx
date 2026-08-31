@@ -83,7 +83,7 @@ export function TransactionForm({ transactionId }: TransactionFormProps) {
     let active = true;
 
     Promise.all([
-      localCategoryRepository.list(),
+      localCategoryRepository.list({ includeInactive: true }),
       localTransactionRepository.list(),
       transactionId
         ? localTransactionRepository.findById(transactionId)
@@ -107,7 +107,9 @@ export function TransactionForm({ transactionId }: TransactionFormProps) {
             ...current,
             categoryId:
               current.categoryId ||
-              nextCategories.find(({ type }) => type === current.type)?.id ||
+              nextCategories.find(
+                ({ isActive, type }) => isActive && type === current.type,
+              )?.id ||
               '',
           }));
         }
@@ -130,10 +132,16 @@ export function TransactionForm({ transactionId }: TransactionFormProps) {
     };
   }, [transactionId]);
 
-  const visibleCategories = useMemo(
-    () => categories.filter(({ type }) => type === draft.type),
-    [categories, draft.type],
-  );
+  const visibleCategories = useMemo(() => {
+    const selectedCategoryIds = new Set([
+      draft.categoryId,
+      ...draft.items.map(({ categoryId }) => categoryId),
+    ]);
+    return categories.filter(
+      ({ id, isActive, type }) =>
+        type === draft.type && (isActive || selectedCategoryIds.has(id)),
+    );
+  }, [categories, draft.categoryId, draft.items, draft.type]);
   const itemTotal = calculateDraftItemTotal(draft.items);
   const unclassifiedAmount = calculateDraftUnclassifiedAmount(draft);
   const hasOverage = unclassifiedAmount !== null && unclassifiedAmount < 0;
@@ -152,8 +160,8 @@ export function TransactionForm({ transactionId }: TransactionFormProps) {
       value: merchant.name,
     }),
   );
-  const categoryOptions = visibleCategories.map(({ id, name }) => ({
-    label: name,
+  const categoryOptions = visibleCategories.map(({ id, isActive, name }) => ({
+    label: isActive ? name : `${name} (숨김)`,
     value: id,
   }));
 
@@ -172,7 +180,10 @@ export function TransactionForm({ transactionId }: TransactionFormProps) {
     updateDraft((current) => ({
       ...current,
       type,
-      categoryId: categories.find((category) => category.type === type)?.id ?? '',
+      categoryId:
+        categories.find(
+          (category) => category.isActive && category.type === type,
+        )?.id ?? '',
       items: current.items.map((item) => ({ ...item, categoryId: null })),
     }));
   }
@@ -498,8 +509,12 @@ function AmountRow({
 }) {
   return (
     <View style={styles.amountRow} testID={testID}>
-      <Text style={danger ? styles.dangerAmount : styles.amountLabel}>{label}</Text>
-      <Text style={danger ? styles.dangerAmount : styles.amountValue}>
+      <Text style={danger ? styles.dangerLabel : styles.amountLabel}>{label}</Text>
+      <Text
+        adjustsFontSizeToFit
+        numberOfLines={1}
+        style={danger ? styles.dangerAmount : styles.amountValue}
+      >
         {value === null ? '—' : `${formatKRW(value)}원`}
       </Text>
     </View>
@@ -554,10 +569,21 @@ const styles = StyleSheet.create({
   },
   amountValue: {
     color: colors.text,
+    flexShrink: 1,
     fontSize: 15,
     fontWeight: '700',
+    maxWidth: '65%',
+    textAlign: 'right',
   },
   dangerAmount: {
+    color: colors.danger,
+    flexShrink: 1,
+    fontSize: 15,
+    fontWeight: '800',
+    maxWidth: '65%',
+    textAlign: 'right',
+  },
+  dangerLabel: {
     color: colors.danger,
     fontSize: 15,
     fontWeight: '800',

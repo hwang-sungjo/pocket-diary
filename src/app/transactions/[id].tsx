@@ -121,7 +121,9 @@ export default function TransactionDetailScreen() {
 
       {state.status === 'error' ? (
         <View style={sharedStyles.card}>
-          <Text style={styles.error}>{state.message}</Text>
+          <Text accessibilityLiveRegion="assertive" style={styles.error}>
+            {state.message}
+          </Text>
           <AppButton onPress={() => router.replace('/transactions')} variant="secondary">
             내역으로 돌아가기
           </AppButton>
@@ -210,6 +212,15 @@ function TransactionDetail({
   return (
     <View style={styles.detailContent} testID="saved-transaction-detail">
       <View style={sharedStyles.card}>
+        {transaction.status === 'needs_confirmation' ? (
+          <View style={styles.confirmationWarning} testID="confirmation-required">
+            <Text style={styles.confirmationTitle}>금액 확인이 필요합니다.</Text>
+            <Text style={styles.confirmationDescription}>
+              반복 규칙이 만든 예정 거래입니다. 금액을 확인하고 거래를 수정·저장하면
+              확정됩니다.
+            </Text>
+          </View>
+        ) : null}
         <View style={styles.detailHeading}>
           <View style={styles.headingText}>
             <Text style={styles.type}>
@@ -217,7 +228,9 @@ function TransactionDetail({
             </Text>
             <Text style={styles.name}>{transaction.name}</Text>
           </View>
-          <Text style={styles.total}>{formatKRW(transaction.totalAmount)}원</Text>
+          <Text adjustsFontSizeToFit numberOfLines={1} style={styles.total}>
+            {formatKRW(transaction.totalAmount)}원
+          </Text>
         </View>
         <DetailRow
           label="일시"
@@ -246,7 +259,9 @@ function TransactionDetail({
             <View key={item.id} style={styles.item}>
               <View style={styles.itemHeading}>
                 <Text style={styles.itemName}>{item.productName}</Text>
-                <Text style={styles.itemPrice}>{formatKRW(item.totalPrice)}원</Text>
+                <Text adjustsFontSizeToFit numberOfLines={1} style={styles.itemPrice}>
+                  {formatKRW(item.totalPrice)}원
+                </Text>
               </View>
               <Text style={styles.itemMeta}>
                 수량 {item.quantity}
@@ -338,8 +353,11 @@ const styles = StyleSheet.create({
   },
   total: {
     color: colors.text,
+    flexShrink: 1,
     fontSize: 24,
     fontWeight: '800',
+    maxWidth: '100%',
+    textAlign: 'right',
   },
   row: {
     alignItems: 'flex-start',
@@ -388,8 +406,11 @@ const styles = StyleSheet.create({
   },
   itemPrice: {
     color: colors.primary,
+    flexShrink: 1,
     fontSize: 16,
     fontWeight: '800',
+    maxWidth: '55%',
+    textAlign: 'right',
   },
   itemMeta: {
     color: colors.muted,
@@ -419,6 +440,22 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   deleteDescription: {
+    color: colors.text,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  confirmationWarning: {
+    backgroundColor: '#FFF4E5',
+    borderRadius: 12,
+    gap: 5,
+    padding: 12,
+  },
+  confirmationTitle: {
+    color: colors.danger,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  confirmationDescription: {
     color: colors.text,
     fontSize: 13,
     lineHeight: 19,

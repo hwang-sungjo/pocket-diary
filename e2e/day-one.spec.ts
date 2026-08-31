@@ -1,16 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
 
-const TEST_TRANSACTION_ID = '0198d66a-0b80-7000-8000-000000000001';
-
 interface StoredTransaction {
   id: string;
-  memo: string | null;
   name: string;
   totalAmount: number;
 }
 
-async function readTestTransactions(page: Page): Promise<StoredTransaction[]> {
-  return page.evaluate(async (transactionId) => {
+async function readTransaction(
+  page: Page,
+  transactionId: string,
+): Promise<StoredTransaction | undefined> {
+  return page.evaluate(async (id) => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open('pocket-diary');
       request.addEventListener('success', () => resolve(request.result));
@@ -27,54 +27,11 @@ async function readTestTransactions(page: Page): Promise<StoredTransaction[]> {
         request.addEventListener('error', () => reject(request.error));
       });
 
-      return rows.filter(({ id }) => id === transactionId);
+      return rows.find((row) => row.id === id);
     } finally {
       database.close();
     }
-  }, TEST_TRANSACTION_ID);
-}
-
-async function updateTestMemo(page: Page, memo: string): Promise<void> {
-  await page.evaluate(
-    async ({ transactionId, nextMemo }) => {
-      const database = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open('pocket-diary');
-        request.addEventListener('success', () => resolve(request.result));
-        request.addEventListener('error', () => reject(request.error));
-      });
-
-      try {
-        const databaseTransaction = database.transaction(
-          'transactions',
-          'readwrite',
-        );
-        const store = databaseTransaction.objectStore('transactions');
-        const storedTransaction = await new Promise<StoredTransaction>(
-          (resolve, reject) => {
-            const request = store.get(transactionId);
-            request.addEventListener('success', () => resolve(request.result));
-            request.addEventListener('error', () => reject(request.error));
-          },
-        );
-
-        storedTransaction.memo = nextMemo;
-        store.put(storedTransaction);
-
-        await new Promise<void>((resolve, reject) => {
-          databaseTransaction.addEventListener('complete', () => resolve());
-          databaseTransaction.addEventListener('abort', () =>
-            reject(databaseTransaction.error),
-          );
-          databaseTransaction.addEventListener('error', () =>
-            reject(databaseTransaction.error),
-          );
-        });
-      } finally {
-        database.close();
-      }
-    },
-    { transactionId: TEST_TRANSACTION_ID, nextMemo: memo },
-  );
+  }, transactionId);
 }
 
 test('주요 화면 사이를 이동할 수 있다', async ({ page }) => {
@@ -100,31 +57,30 @@ test('주요 화면 사이를 이동할 수 있다', async ({ page }) => {
   }
 });
 
-test('테스트 거래가 IndexedDB에 저장되고 새로고침 후 유지된다', async ({
+test('사용자가 등록한 거래가 IndexedDB에 저장되고 앱 재실행 후 유지된다', async ({
   page,
 }) => {
-  await page.goto('/');
-  await expect(page.getByTestId('storage-verification-result')).toContainText(
-    '저장 및 재조회 완료',
-  );
+  await page.goto('/transactions/new');
+  await page.getByLabel('거래명').fill('로컬 재실행 검증');
+  await page.getByLabel('총금액').fill('12500');
+  await page.getByTestId('save-transaction').click();
+  await expect(page).toHaveURL(/\/transactions\/[0-9a-f-]{36}$/);
+  const transactionId = page.url().split('/').at(-1);
+  expect(transactionId).toBeTruthy();
 
-  const savedTransactions = await readTestTransactions(page);
-  expect(savedTransactions).toHaveLength(1);
-  expect(savedTransactions[0]).toMatchObject({
-    id: TEST_TRANSACTION_ID,
-    name: 'Day 1 로컬 저장 테스트',
+  expect(await readTransaction(page, transactionId as string)).toMatchObject({
+    id: transactionId,
+    name: '로컬 재실행 검증',
     totalAmount: 12500,
   });
 
-  const persistenceMarker = 'e2e-persistence-marker';
-  await updateTestMemo(page, persistenceMarker);
   await page.reload();
-  await expect(page.getByTestId('storage-verification-result')).toContainText(
-    '저장 및 재조회 완료',
-  );
-
-  const reloadedTransactions = await readTestTransactions(page);
-  expect(reloadedTransactions).toHaveLength(1);
-  expect(reloadedTransactions[0]?.memo).toBe(persistenceMarker);
+  await expect(
+    page.getByText('로컬 재실행 검증', { exact: true }),
+  ).toBeVisible();
+  expect(await readTransaction(page, transactionId as string)).toMatchObject({
+    id: transactionId,
+    name: '로컬 재실행 검증',
+    totalAmount: 12500,
+  });
 });
-

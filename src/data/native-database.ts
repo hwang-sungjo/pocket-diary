@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 
 import { DEFAULT_CATEGORIES } from '@/domain/category';
 
-const LATEST_SCHEMA_VERSION = 4;
+const LATEST_SCHEMA_VERSION = 5;
 
 let databasePromise: Promise<SQLite.SQLiteDatabase> | undefined;
 
@@ -130,6 +130,46 @@ async function applyMigration(
           FROM products
           WHERE products.id = transaction_items.product_id
         );
+      `);
+    }
+
+    if (version === 5) {
+      await transaction.execAsync(`
+        ALTER TABLE transactions
+          ADD COLUMN status TEXT NOT NULL DEFAULT 'confirmed'
+          CHECK (status IN ('confirmed', 'needs_confirmation'));
+        ALTER TABLE transactions ADD COLUMN recurring_rule_id TEXT;
+        ALTER TABLE transactions ADD COLUMN scheduled_date TEXT;
+
+        CREATE UNIQUE INDEX IF NOT EXISTS
+          transactions_recurring_occurrence_idx
+          ON transactions(recurring_rule_id, scheduled_date)
+          WHERE recurring_rule_id IS NOT NULL AND scheduled_date IS NOT NULL;
+
+        CREATE TABLE IF NOT EXISTS recurring_rules (
+          id TEXT PRIMARY KEY NOT NULL,
+          type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
+          name TEXT NOT NULL,
+          total_amount INTEGER NOT NULL CHECK (total_amount > 0),
+          category_id TEXT NOT NULL,
+          frequency TEXT NOT NULL
+            CHECK (frequency IN ('weekly', 'monthly', 'yearly', 'custom')),
+          interval INTEGER NOT NULL CHECK (interval > 0),
+          start_date TEXT NOT NULL,
+          end_date TEXT,
+          scheduled_time TEXT NOT NULL,
+          next_scheduled_date TEXT NOT NULL,
+          requires_confirmation INTEGER NOT NULL
+            CHECK (requires_confirmation IN (0, 1)),
+          notification_enabled INTEGER NOT NULL
+            CHECK (notification_enabled IN (0, 1)),
+          is_active INTEGER NOT NULL CHECK (is_active IN (0, 1)),
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS recurring_rules_next_scheduled_date_idx
+          ON recurring_rules(is_active, next_scheduled_date);
       `);
     }
 

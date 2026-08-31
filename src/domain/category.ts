@@ -62,3 +62,46 @@ export function sortCategories(categories: readonly Category[]): Category[] {
       left.name.localeCompare(right.name, 'ko'),
   );
 }
+
+export function createCustomCategory(
+  id: string,
+  type: CategoryType,
+  name: string,
+  categories: readonly Category[],
+  now = new Date(),
+): Category {
+  const trimmedName = name.trim().replace(/\s+/g, ' ');
+
+  if (!trimmedName) {
+    throw new Error('카테고리 이름을 입력해 주세요.');
+  }
+
+  const normalizedName = trimmedName.toLocaleLowerCase('ko-KR');
+  if (
+    categories.some(
+      (category) =>
+        category.type === type &&
+        category.name.trim().replace(/\s+/g, ' ').toLocaleLowerCase('ko-KR') ===
+          normalizedName,
+    )
+  ) {
+    throw new Error('같은 유형에 이미 존재하는 카테고리입니다.');
+  }
+
+  const timestamp = now.toISOString();
+  const maxSortOrder = categories
+    .filter((category) => category.type === type)
+    .reduce((maximum, category) => Math.max(maximum, category.sortOrder), 0);
+
+  return {
+    id,
+    type,
+    name: trimmedName,
+    sortOrder: maxSortOrder + 1,
+    isDefault: false,
+    isActive: true,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    deletedAt: null,
+  };
+}

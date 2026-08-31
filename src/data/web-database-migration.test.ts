@@ -36,17 +36,25 @@ async function createVersionOneDatabase(): Promise<void> {
   });
 }
 
-test('IndexedDB v1 거래를 보존하면서 v3 기준 데이터를 추가한다', async () => {
+test('IndexedDB v1 거래를 보존하면서 v5 반복 거래 스키마를 추가한다', async () => {
   await createVersionOneDatabase();
 
   const database = await getWebDatabase();
   const transactions = await database.getAll('transactions');
   const categories = await database.getAll('categories');
 
-  assert.equal(database.version, 3);
+  assert.equal(database.version, 5);
   assert.equal(transactions.length, 1);
   assert.equal(transactions[0]?.name, 'Day 1 로컬 저장 테스트');
   assert.equal(categories.length, 18);
   assert.equal(database.objectStoreNames.contains('merchants'), true);
   assert.equal(database.objectStoreNames.contains('products'), true);
+  assert.equal(database.objectStoreNames.contains('recurringRules'), true);
+  assert.equal(
+    database
+      .transaction('transactions', 'readonly')
+      .objectStore('transactions')
+      .indexNames.contains('by-recurring-occurrence'),
+    true,
+  );
 });

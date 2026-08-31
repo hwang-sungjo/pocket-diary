@@ -11,10 +11,15 @@ Pocket Diary는 iPhone과 Web에서 사용할 수 있는 로컬 우선(local-fir
 - 최근 입력을 활용한 품목명 자동완성
 - 월별 거래 내역 조회
 - 품목 검색 및 구매 이력 조회
+- 사용자 카테고리 추가·숨김·재활성화
+- 반복 거래 규칙과 예정일별 중복 방지
+- 확정 거래 기준 월별 수입·지출·잔액과 카테고리별 지출 통계
+- 상세 품목 분류와 미분류 금액을 나누는 이중 집계 방지
+- 오프라인 저장·앱 재실행과 빈 화면·오류·큰 금액 품질 검증
 - iOS SQLite 및 Web IndexedDB 기반 로컬 저장
 - 단위 테스트와 데스크톱·모바일 Web Playwright E2E 테스트
 
-로그인, 클라우드 동기화, 영수증 OCR과 같은 기능은 현재 P0 범위에 포함하지 않습니다. 상세 일정과 비즈니스 규칙은 [PRODUCT_PLAN.md](docs/PRODUCT_PLAN.md)를 참고하세요.
+로그인, 클라우드 동기화, 실제 Web 배포와 영수증 OCR은 현재 P0 범위에 포함하지 않습니다. 계정 기능을 도입할 때 가입을 필수로 전환하고 기존 로컬 데이터의 이관 절차를 함께 설계할 예정입니다. Google Sheets는 계정·클라우드 안정화 이후로 연기했습니다. 상세 일정과 비즈니스 규칙은 [PRODUCT_PLAN.md](docs/PRODUCT_PLAN.md)를 참고하세요.
 
 ## 프로젝트 구조
 
@@ -27,6 +32,7 @@ pocket_diary/
 │   ├── data/         # 저장소 인터페이스, SQLite/IndexedDB 어댑터, 마이그레이션
 │   └── domain/       # 거래·품목 도메인 모델과 비즈니스 규칙
 ├── e2e/              # Playwright Web E2E 테스트
+├── scripts/          # 계정 없이 사용하는 로컬 Web 프리뷰 서버
 ├── docs/             # 제품 계획과 프로젝트 작업 지침
 ├── assets/           # 앱 아이콘과 정적 이미지
 ├── app.json          # Expo 앱 설정
@@ -75,6 +81,12 @@ npm run web
 
 터미널에 표시되는 주소를 브라우저에서 열면 됩니다.
 
+배포 환경에 가까운 정적 결과를 로컬에서 확인하려면 다음 명령을 사용합니다. Web export 후 `http://127.0.0.1:4173`에서 프리뷰를 제공합니다.
+
+```bash
+npm run preview:web
+```
+
 ### iOS Simulator 실행
 
 Xcode를 처음 설치한 환경이라면 먼저 Command Line Tools와 초기 구성 상태를 확인합니다.
@@ -91,6 +103,12 @@ xcrun simctl list devices available
 open -a Simulator
 nvm use
 npm run ios
+```
+
+Expo 계정 없이 네이티브 iOS 개발 빌드를 만들려면 다음 명령을 사용합니다. 최초 실행에는 CocoaPods가 필요하며 생성되는 `ios/` 디렉터리는 Git에서 무시됩니다.
+
+```bash
+npm run ios:local
 ```
 
 ## 테스트와 검증
@@ -111,6 +129,8 @@ npx playwright install chromium
 | `npm run typecheck` | 앱·테스트·E2E TypeScript 검사 |
 | `npm run lint` | ESLint 검사 |
 | `npx expo-doctor@latest` | Expo 설정과 패키지 호환성 검사 |
+| `npm run preview:web` | Web 정적 export와 로컬 프리뷰 실행 |
+| `npm run ios:local` | 계정 없는 iOS Simulator 네이티브 개발 빌드 |
 | `npm run export:web` | Web 정적 번들 생성 확인 |
 | `npm run export:ios` | iOS 번들 생성 확인 |
 
@@ -131,7 +151,16 @@ npm run export:ios
 - iOS와 Web은 서로 다른 기기 저장소를 사용하므로 데이터가 자동으로 동기화되지 않습니다.
 - 브라우저 사이트 데이터나 Simulator의 앱 데이터를 삭제하면 저장된 거래도 함께 삭제됩니다.
 - 금액은 부동소수점 오차를 피하기 위해 정수 단위로 저장합니다.
+- 새 사용자의 원장에는 개발용 테스트 거래를 자동으로 추가하지 않습니다. 이전 개발 DB에 남아 있는 `Day 1 로컬 저장 테스트` 거래는 사용자가 직접 삭제할 수 있습니다.
+- `금액 확인 필요` 반복 거래는 사용자가 확인·저장하기 전까지 통계에서 제외됩니다.
+- 월 합계는 거래 총액을 한 번만 더하고, 상세 품목 금액은 카테고리 배분에만 사용합니다.
 - 화면 코드는 플랫폼별 저장 기술에 직접 의존하지 않고 `TransactionRepository` 인터페이스를 사용합니다.
+
+## 알려진 제한
+
+- Web은 실제 배포 전이므로 로컬 프리뷰 서버가 실행 중이어야 처음 열 수 있습니다. 앱을 연 뒤의 로컬 CRUD는 인터넷 연결 없이 동작합니다.
+- iOS와 Web 데이터는 아직 서로 동기화되지 않습니다.
+- 실제 VoiceOver 수동 점검과 제품명 수동 병합은 다음 버전 작업입니다.
 
 ## 관련 문서
 

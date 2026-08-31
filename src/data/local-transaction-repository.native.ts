@@ -20,6 +20,9 @@ interface TransactionRow {
   merchant_name_snapshot: string | null;
   payment_method: string | null;
   memo: string | null;
+  status: Transaction['status'];
+  recurring_rule_id: string | null;
+  scheduled_date: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -49,6 +52,9 @@ function toTransaction(row: TransactionRow): Transaction {
     merchantName: row.merchant_name_snapshot,
     paymentMethod: row.payment_method,
     memo: row.memo,
+    status: row.status,
+    recurringRuleId: row.recurring_rule_id,
+    scheduledDate: row.scheduled_date,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -96,8 +102,9 @@ class SQLiteTransactionRepository implements TransactionRepository {
       await database.runAsync(
         `INSERT INTO transactions (
           id, type, name, total_amount, occurred_at, category_id, merchant_id,
-          merchant_name, payment_method, memo, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          merchant_name, payment_method, memo, status, recurring_rule_id,
+          scheduled_date, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           type = excluded.type,
           name = excluded.name,
@@ -108,6 +115,9 @@ class SQLiteTransactionRepository implements TransactionRepository {
           merchant_name = excluded.merchant_name,
           payment_method = excluded.payment_method,
           memo = excluded.memo,
+          status = excluded.status,
+          recurring_rule_id = excluded.recurring_rule_id,
+          scheduled_date = excluded.scheduled_date,
           updated_at = excluded.updated_at`,
         transaction.id,
         transaction.type,
@@ -119,6 +129,9 @@ class SQLiteTransactionRepository implements TransactionRepository {
         transaction.merchantName,
         transaction.paymentMethod,
         transaction.memo,
+        transaction.status,
+        transaction.recurringRuleId,
+        transaction.scheduledDate,
         transaction.createdAt,
         transaction.updatedAt,
       );
@@ -197,6 +210,20 @@ class SQLiteTransactionRepository implements TransactionRepository {
       transaction: toTransaction(row),
       items: itemRows.map(toTransactionItem),
     };
+  }
+
+  async findByRecurringOccurrence(
+    recurringRuleId: string,
+    scheduledDate: string,
+  ): Promise<TransactionAggregate | null> {
+    const database = await getNativeDatabase();
+    const row = await database.getFirstAsync<{ id: string }>(
+      `SELECT id FROM transactions
+       WHERE recurring_rule_id = ? AND scheduled_date = ?`,
+      recurringRuleId,
+      scheduledDate,
+    );
+    return row ? this.findById(row.id) : null;
   }
 
   async list(): Promise<TransactionAggregate[]> {

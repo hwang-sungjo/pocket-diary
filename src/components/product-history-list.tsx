@@ -82,7 +82,15 @@ export function ProductHistoryList() {
         </View>
       ) : null}
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? (
+        <Text
+          accessibilityLiveRegion="assertive"
+          style={styles.error}
+          testID="product-history-error"
+        >
+          {error}
+        </Text>
+      ) : null}
 
       {!loading && !error && filteredHistories.length === 0 ? (
         <View style={sharedStyles.card}>
@@ -109,6 +117,7 @@ export function ProductHistoryList() {
 
           {history.purchases.map((purchase) => (
             <Pressable
+              accessibilityLabel={`${history.name}, ${purchaseDateFormatter.format(new Date(purchase.occurredAt))}, ${formatKRW(purchase.totalPrice)}원 거래 열기`}
               accessibilityRole="button"
               key={purchase.itemId}
               onPress={() =>
@@ -134,7 +143,9 @@ export function ProductHistoryList() {
                     : ` · 단가 ${formatKRW(purchase.unitPrice)}원`}
                 </Text>
               </View>
-              <Text style={styles.price}>{formatKRW(purchase.totalPrice)}원</Text>
+              <Text adjustsFontSizeToFit numberOfLines={1} style={styles.price}>
+                {formatKRW(purchase.totalPrice)}원
+              </Text>
             </Pressable>
           ))}
         </View>
@@ -203,7 +214,10 @@ const styles = StyleSheet.create({
   },
   price: {
     color: colors.primary,
+    flexShrink: 1,
     fontSize: 15,
     fontWeight: '800',
+    maxWidth: '48%',
+    textAlign: 'right',
   },
 });

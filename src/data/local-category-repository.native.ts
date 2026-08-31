@@ -64,6 +64,53 @@ class SQLiteCategoryRepository implements CategoryRepository {
 
     return rows.map(toCategory);
   }
+
+  async save(category: Category): Promise<void> {
+    const database = await getNativeDatabase();
+    await database.runAsync(
+      `INSERT INTO categories (
+        id, type, name, sort_order, is_default, is_active,
+        created_at, updated_at, deleted_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        type = excluded.type,
+        name = excluded.name,
+        sort_order = excluded.sort_order,
+        is_active = excluded.is_active,
+        updated_at = excluded.updated_at,
+        deleted_at = excluded.deleted_at`,
+      category.id,
+      category.type,
+      category.name,
+      category.sortOrder,
+      category.isDefault ? 1 : 0,
+      category.isActive ? 1 : 0,
+      category.createdAt,
+      category.updatedAt,
+      category.deletedAt,
+    );
+  }
+
+  async setActive(
+    id: string,
+    isActive: boolean,
+    updatedAt: string,
+  ): Promise<void> {
+    const database = await getNativeDatabase();
+    const result = await database.runAsync(
+      `UPDATE categories
+       SET is_active = ?, updated_at = ?, deleted_at = ?
+       WHERE id = ?`,
+      isActive ? 1 : 0,
+      updatedAt,
+      isActive ? null : updatedAt,
+      id,
+    );
+
+    if (result.changes === 0) {
+      throw new Error('변경할 카테고리를 찾지 못했습니다.');
+    }
+  }
 }
 
 export const localCategoryRepository: CategoryRepository =

@@ -110,7 +110,15 @@ export function TransactionList() {
         </View>
       ) : null}
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? (
+        <Text
+          accessibilityLiveRegion="assertive"
+          style={styles.error}
+          testID="transaction-list-error"
+        >
+          {error}
+        </Text>
+      ) : null}
 
       {!loading && !error && groups.length === 0 ? (
         <View style={sharedStyles.card}>
@@ -131,6 +139,7 @@ export function TransactionList() {
               const { transaction, items } = aggregate;
               return (
                 <Pressable
+                  accessibilityLabel={`${transaction.name}, ${transaction.type === 'expense' ? '지출' : '수입'} ${formatKRW(transaction.totalAmount)}원`}
                   accessibilityRole="button"
                   key={transaction.id}
                   onPress={() =>
@@ -147,6 +156,11 @@ export function TransactionList() {
                 >
                   <View style={styles.transactionText}>
                     <Text style={styles.transactionName}>{transaction.name}</Text>
+                    {transaction.status === 'needs_confirmation' ? (
+                      <Text style={styles.confirmationRequired}>
+                        금액 확인 필요
+                      </Text>
+                    ) : null}
                     <Text style={styles.meta}>
                       {categoryNames.get(transaction.categoryId) ?? '알 수 없음'}
                       {transaction.merchantName
@@ -156,6 +170,8 @@ export function TransactionList() {
                     </Text>
                   </View>
                   <Text
+                    adjustsFontSizeToFit
+                    numberOfLines={1}
                     style={
                       transaction.type === 'expense'
                         ? styles.expenseAmount
@@ -238,18 +254,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  confirmationRequired: {
+    color: colors.danger,
+    fontSize: 12,
+    fontWeight: '800',
+  },
   meta: {
     color: colors.muted,
     fontSize: 13,
   },
   expenseAmount: {
     color: colors.danger,
+    flexShrink: 1,
     fontSize: 16,
     fontWeight: '800',
+    maxWidth: '52%',
+    textAlign: 'right',
   },
   incomeAmount: {
     color: colors.success,
+    flexShrink: 1,
     fontSize: 16,
     fontWeight: '800',
+    maxWidth: '52%',
+    textAlign: 'right',
   },
 });

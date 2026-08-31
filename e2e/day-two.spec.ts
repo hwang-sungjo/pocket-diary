@@ -36,10 +36,15 @@ test('기본 카테고리를 조회하고 새로고침 후에도 유지한다', 
 
   await expect(page.getByTestId('expense-category-count')).toHaveText('13개');
   await expect(page.getByTestId('income-category-count')).toHaveText('5개');
-  await expect(page.getByText('식비', { exact: true })).toBeVisible();
-  await expect(page.getByText('기타 지출', { exact: true })).toBeVisible();
-  await expect(page.getByText('월급', { exact: true })).toBeVisible();
-  await expect(page.getByText('기타 수입', { exact: true })).toBeVisible();
+  const categoryList = page.getByTestId('category-list');
+  await expect(categoryList.getByText('식비', { exact: true })).toBeVisible();
+  await expect(
+    categoryList.getByText('기타 지출', { exact: true }),
+  ).toBeVisible();
+  await expect(categoryList.getByText('월급', { exact: true })).toBeVisible();
+  await expect(
+    categoryList.getByText('기타 수입', { exact: true }),
+  ).toBeVisible();
 
   const categories = await readCategories(page);
   expect(categories).toHaveLength(18);

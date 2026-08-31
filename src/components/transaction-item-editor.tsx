@@ -56,7 +56,10 @@ export function TransactionItemEditor({
   );
   const categoryOptions = [
     { label: '거래 카테고리 사용', value: '__inherit__' },
-    ...categories.map(({ id, name }) => ({ label: name, value: id })),
+    ...categories.map(({ id, isActive, name }) => ({
+      label: isActive ? name : `${name} (숨김)`,
+      value: id,
+    })),
   ];
   const quantity = Number(item.quantity);
 

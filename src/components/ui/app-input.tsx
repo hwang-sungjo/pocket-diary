@@ -26,13 +26,17 @@ export function AppInput({
         {required ? <Text style={styles.required}> *</Text> : null}
       </Text>
       <TextInput
+        accessibilityHint={errorMessage ?? props.accessibilityHint}
         accessibilityLabel={props.accessibilityLabel ?? label}
         placeholderTextColor={colors.muted}
         style={[styles.input, errorMessage ? styles.inputError : null, style]}
         {...props}
       />
       {supportingText ? (
-        <Text style={errorMessage ? styles.error : styles.helper}>
+        <Text
+          accessibilityLiveRegion={errorMessage ? 'assertive' : 'none'}
+          style={errorMessage ? styles.error : styles.helper}
+        >
           {supportingText}
         </Text>
       ) : null}

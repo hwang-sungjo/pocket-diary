@@ -18,6 +18,7 @@ const contentTypes = new Map([
   ['.json', 'application/json; charset=utf-8'],
   ['.png', 'image/png'],
   ['.svg', 'image/svg+xml'],
+  ['.webmanifest', 'application/manifest+json; charset=utf-8'],
   ['.webp', 'image/webp'],
 ]);
 
@@ -34,8 +35,13 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    const cacheControl =
+      filePath.endsWith(`${sep}sw.js`) || extname(filePath) === '.html'
+        ? 'no-cache'
+        : 'public, max-age=3600';
+
     response.writeHead(200, {
-      'cache-control': 'no-store',
+      'cache-control': cacheControl,
       'content-type': contentTypes.get(extname(filePath)) ?? 'application/octet-stream',
     });
 

@@ -17,6 +17,7 @@ Pocket Diary는 iPhone과 Web에서 사용할 수 있는 로컬 우선(local-fir
 - 상세 품목 분류와 미분류 금액을 나누는 이중 집계 방지
 - 오프라인 저장·앱 재실행과 빈 화면·오류·큰 금액 품질 검증
 - iOS SQLite 및 Web IndexedDB 기반 로컬 저장
+- Web 정적 프리뷰의 PWA 설치 및 오프라인 콜드 스타트
 - 단위 테스트와 데스크톱·모바일 Web Playwright E2E 테스트
 
 로그인, 클라우드 동기화, 실제 Web 배포와 영수증 OCR은 현재 P0 범위에 포함하지 않습니다. 계정 기능을 도입할 때 가입을 필수로 전환하고 기존 로컬 데이터의 이관 절차를 함께 설계할 예정입니다. Google Sheets는 계정·클라우드 안정화 이후로 연기했습니다. 상세 일정과 비즈니스 규칙은 [PRODUCT_PLAN.md](docs/PRODUCT_PLAN.md)를 참고하세요.
@@ -87,6 +88,8 @@ npm run web
 npm run preview:web
 ```
 
+프리뷰를 한 번 열어 서비스 워커 설치가 끝나면 같은 주소의 정적 앱이 브라우저 캐시에 저장됩니다. 이후에는 프리뷰 서버가 중지되거나 네트워크 연결이 없어도 북마크 또는 설치된 Web 앱을 다시 열어 로컬 CRUD를 사용할 수 있습니다. 새 브라우저 프로필이나 사이트 데이터를 삭제한 환경에서는 최초 한 번 서버 연결이 필요합니다. 개발 서버인 `npm run web`은 이 PWA 캐시 검증 대상이 아닙니다.
+
 ### iOS Simulator 실행
 
 Xcode를 처음 설치한 환경이라면 먼저 Command Line Tools와 초기 구성 상태를 확인합니다.
@@ -125,6 +128,7 @@ npx playwright install chromium
 | --- | --- |
 | `npm test` | 도메인 및 저장소 단위 테스트 |
 | `npm run test:e2e` | 데스크톱·모바일 Web E2E 테스트 |
+| `npm run test:e2e:pwa` | 정적 프리뷰의 오프라인 콜드 스타트 및 IndexedDB CRUD 테스트 |
 | `npm run test:e2e:headed` | 브라우저를 표시하며 E2E 테스트 |
 | `npm run typecheck` | 앱·테스트·E2E TypeScript 검사 |
 | `npm run lint` | ESLint 검사 |
@@ -139,6 +143,7 @@ npx playwright install chromium
 ```bash
 npm test
 npm run test:e2e
+npm run test:e2e:pwa
 npm run typecheck
 npm run lint
 npx expo-doctor@latest
@@ -158,7 +163,7 @@ npm run export:ios
 
 ## 알려진 제한
 
-- Web은 실제 배포 전이므로 로컬 프리뷰 서버가 실행 중이어야 처음 열 수 있습니다. 앱을 연 뒤의 로컬 CRUD는 인터넷 연결 없이 동작합니다.
+- Web은 실제 배포 전이므로 새 브라우저에서 처음 열 때 로컬 프리뷰 서버가 필요합니다. 한 번 연 뒤에는 PWA 캐시로 서버 없이 재실행하고 IndexedDB CRUD를 사용할 수 있습니다.
 - iOS와 Web 데이터는 아직 서로 동기화되지 않습니다.
 - 실제 VoiceOver 수동 점검과 제품명 수동 병합은 다음 버전 작업입니다.
 

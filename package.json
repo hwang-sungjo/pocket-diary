@@ -11,15 +11,17 @@
     "ios": "expo start --ios",
     "ios:local": "expo run:ios",
     "web": "expo start --web",
-    "preview:web": "expo export --platform web && node scripts/preview-web.mjs",
+    "build:web": "expo export --platform web && node scripts/generate-service-worker.mjs",
+    "preview:web": "npm run build:web && node scripts/preview-web.mjs",
     "test": "node --import tsx --test",
     "test:e2e": "playwright test",
+    "test:e2e:pwa": "playwright test --config playwright.pwa.config.ts",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:report": "playwright show-report",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.e2e.json --noEmit",
     "lint": "expo lint",
     "export:ios": "expo export --platform ios",
-    "export:web": "expo export --platform web"
+    "export:web": "npm run build:web"
   },
   "dependencies": {
     "@expo/ui": "~57.0.14",
@@ -57,7 +59,8 @@
     "eslint-config-expo": "~57.0.2",
     "fake-indexeddb": "^6.2.5",
     "tsx": "^4.23.12",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "workbox-build": "^7.4.1"
   },
   "overrides": {
     "xcode": {

@@ -63,6 +63,34 @@ export function sortCategories(categories: readonly Category[]): Category[] {
   );
 }
 
+export interface CategoryOrderUpdate {
+  id: string;
+  sortOrder: number;
+}
+
+export function moveCategory(
+  categories: readonly Category[],
+  categoryId: string,
+  direction: -1 | 1,
+): CategoryOrderUpdate[] | null {
+  const category = categories.find(({ id }) => id === categoryId);
+  if (!category) {
+    return null;
+  }
+
+  const siblings = sortCategories(categories.filter(({ type }) => type === category.type));
+  const index = siblings.findIndex(({ id }) => id === categoryId);
+  const neighborIndex = index + direction;
+  if (neighborIndex < 0 || neighborIndex >= siblings.length) {
+    return null;
+  }
+
+  [siblings[index], siblings[neighborIndex]] = [siblings[neighborIndex]!, siblings[index]!];
+  return siblings.flatMap(({ id, sortOrder }, position) =>
+    sortOrder === position + 1 ? [] : [{ id, sortOrder: position + 1 }],
+  );
+}
+
 export function createCustomCategory(
   id: string,
   type: CategoryType,

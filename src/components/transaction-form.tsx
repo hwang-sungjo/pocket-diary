@@ -316,7 +316,7 @@ export function TransactionForm({ transactionId }: TransactionFormProps) {
           </View>
         </View>
 
-        <View style={styles.fieldGroup}>
+        <View style={styles.fieldGroup} testID="transaction-category-options">
           <Text style={styles.label}>카테고리 *</Text>
           <ChoiceChips
             accessibilityLabel="거래 카테고리"

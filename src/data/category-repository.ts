@@ -1,4 +1,4 @@
-import type { Category, CategoryType } from '@/domain/category';
+import type { Category, CategoryOrderUpdate, CategoryType } from '@/domain/category';
 
 export interface CategoryListOptions {
   type?: CategoryType;
@@ -10,4 +10,5 @@ export interface CategoryRepository {
   list(options?: CategoryListOptions): Promise<Category[]>;
   save(category: Category): Promise<void>;
   setActive(id: string, isActive: boolean, updatedAt: string): Promise<void>;
+  setSortOrders(updates: readonly CategoryOrderUpdate[], updatedAt: string): Promise<void>;
 }

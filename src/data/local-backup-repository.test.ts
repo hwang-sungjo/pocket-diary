@@ -7,7 +7,7 @@ import { localBackupRepository } from '@/data/local-backup-repository';
 import { localCategoryRepository } from '@/data/local-category-repository';
 import { localRecurringRuleRepository } from '@/data/local-recurring-rule-repository';
 import { localTransactionRepository } from '@/data/local-transaction-repository';
-import { createCustomCategory } from '@/domain/category';
+import { createCustomCategory, moveCategory } from '@/domain/category';
 import { buildRecurringRule, createRecurringRuleDraft } from '@/domain/recurring-rule';
 import { createDayOneTestTransaction } from '@/domain/transaction';
 
@@ -16,6 +16,16 @@ test('로컬 백업을 복원하면 네 데이터 종류가 유지되고 재복�
   const custom = createCustomCategory('custom-category', 'expense', '반려동물', categories);
   await localCategoryRepository.save(custom);
   await localCategoryRepository.setActive(custom.id, false, new Date().toISOString());
+  await localCategoryRepository.setSortOrders(
+    moveCategory(
+      await localCategoryRepository.list({ includeInactive: true }),
+      custom.id,
+      -1,
+    )!,
+    new Date().toISOString(),
+  );
+  const expectedCategoryOrder = (await localCategoryRepository.list({ includeInactive: true }))
+    .map(({ id }) => id);
   const original = createDayOneTestTransaction(new Date('2026-08-24T09:00:00Z'));
   original.transaction.categoryId = custom.id;
   original.transaction.name = '복원할 거래';
@@ -42,12 +52,24 @@ test('로컬 백업을 복원하면 네 데이터 종류가 유지되고 재복�
 
   await localTransactionRepository.delete(original.transaction.id);
   await localCategoryRepository.setActive(custom.id, true, new Date().toISOString());
+  await localCategoryRepository.setSortOrders(
+    moveCategory(
+      await localCategoryRepository.list({ includeInactive: true }),
+      custom.id,
+      1,
+    )!,
+    new Date().toISOString(),
+  );
   await localBackupRepository.replaceData(backup);
   await localBackupRepository.replaceData(backup);
 
   assert.deepEqual(await localTransactionRepository.findById(original.transaction.id), original);
   assert.equal((await localTransactionRepository.list()).length, 1);
   assert.equal((await localCategoryRepository.findById(custom.id))?.isActive, false);
+  assert.deepEqual(
+    (await localCategoryRepository.list({ includeInactive: true })).map(({ id }) => id),
+    expectedCategoryOrder,
+  );
   assert.deepEqual(await localRecurringRuleRepository.findById(rule.id), rule);
 });
 

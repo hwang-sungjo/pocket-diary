@@ -10,6 +10,7 @@ import { colors } from '@/constants/theme';
 import { localCategoryRepository } from '@/data/local-category-repository';
 import {
   createCustomCategory,
+  moveCategory,
   type Category,
   type CategoryType,
 } from '@/domain/category';
@@ -20,16 +21,20 @@ const CATEGORY_TYPES = [
 ] as const;
 
 interface CategoryGroupProps {
+  busy: boolean;
   categories: Category[];
   countTestID: string;
+  onMove: (category: Category, direction: -1 | 1) => void;
   onToggle: (category: Category) => void;
   title: string;
   updatingId: string | null;
 }
 
 function CategoryGroup({
+  busy,
   categories,
   countTestID,
+  onMove,
   onToggle,
   title,
   updatingId,
@@ -45,7 +50,7 @@ function CategoryGroup({
         </Text>
       </View>
       <View style={styles.categoryRows}>
-        {categories.map((category) => (
+        {categories.map((category, index) => (
           <View
             key={category.id}
             style={[styles.categoryRow, !category.isActive && styles.inactiveRow]}
@@ -58,14 +63,35 @@ function CategoryGroup({
                 {category.isActive ? '사용 중' : '숨김'}
               </Text>
             </View>
-            <AppButton
-              accessibilityLabel={`${category.name} ${category.isActive ? '숨기기' : '활성화'}`}
-              loading={updatingId === category.id}
-              onPress={() => onToggle(category)}
-              variant={category.isActive ? 'danger' : 'secondary'}
-            >
-              {category.isActive ? '숨기기' : '활성화'}
-            </AppButton>
+            <View style={styles.categoryActions}>
+              <AppButton
+                accessibilityLabel={`${category.name} 위로 이동`}
+                disabled={busy || index === 0}
+                onPress={() => onMove(category, -1)}
+                testID={`category-move-up-${category.id}`}
+                variant="secondary"
+              >
+                ↑
+              </AppButton>
+              <AppButton
+                accessibilityLabel={`${category.name} 아래로 이동`}
+                disabled={busy || index === categories.length - 1}
+                onPress={() => onMove(category, 1)}
+                testID={`category-move-down-${category.id}`}
+                variant="secondary"
+              >
+                ↓
+              </AppButton>
+              <AppButton
+                accessibilityLabel={`${category.name} ${category.isActive ? '숨기기' : '활성화'}`}
+                disabled={busy && updatingId !== category.id}
+                loading={updatingId === category.id}
+                onPress={() => onToggle(category)}
+                variant={category.isActive ? 'danger' : 'secondary'}
+              >
+                {category.isActive ? '숨기기' : '활성화'}
+              </AppButton>
+            </View>
           </View>
         ))}
       </View>
@@ -191,6 +217,29 @@ export function CategoryListCard({
     }
   }
 
+  async function changeCategoryOrder(category: Category, direction: -1 | 1) {
+    const updates = moveCategory(categories, category.id, direction);
+    if (!updates) {
+      return;
+    }
+
+    setUpdatingId(category.id);
+    setError(null);
+    try {
+      await localCategoryRepository.setSortOrders(updates, new Date().toISOString());
+      await loadCategories();
+      onCategoriesChange?.();
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : '카테고리 순서를 변경하지 못했습니다.',
+      );
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
   const expenses = categories.filter(({ type }) => type === 'expense');
   const incomes = categories.filter(({ type }) => type === 'income');
 
@@ -200,7 +249,7 @@ export function CategoryListCard({
         <View style={styles.headingText}>
           <Text style={sharedStyles.cardTitle}>카테고리 관리</Text>
           <Text style={sharedStyles.body}>
-            사용자 카테고리를 추가하거나 거래 입력에서 사용하지 않을 항목을 숨깁니다.
+            카테고리를 추가·숨기거나 위아래로 이동해 표시 순서를 바꿉니다.
           </Text>
         </View>
         <AppButton
@@ -250,15 +299,19 @@ export function CategoryListCard({
       {!loading ? (
         <View style={styles.groups}>
           <CategoryGroup
+            busy={updatingId !== null || saving}
             categories={expenses}
             countTestID="expense-category-count"
+            onMove={(category, direction) => void changeCategoryOrder(category, direction)}
             onToggle={(category) => void toggleCategory(category)}
             title="지출"
             updatingId={updatingId}
           />
           <CategoryGroup
+            busy={updatingId !== null || saving}
             categories={incomes}
             countTestID="income-category-count"
+            onMove={(category, direction) => void changeCategoryOrder(category, direction)}
             onToggle={(category) => void toggleCategory(category)}
             title="수입"
             updatingId={updatingId}
@@ -323,6 +376,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     borderRadius: 12,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
     justifyContent: 'space-between',
     padding: 10,
@@ -333,6 +387,12 @@ const styles = StyleSheet.create({
   categoryText: {
     flex: 1,
     gap: 3,
+    minWidth: 90,
+  },
+  categoryActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
   },
   categoryName: {
     color: colors.text,

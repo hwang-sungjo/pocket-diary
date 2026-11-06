@@ -3,7 +3,7 @@ import type {
   CategoryRepository,
 } from '@/data/category-repository';
 import { getNativeDatabase } from '@/data/native-database';
-import type { Category, CategoryType } from '@/domain/category';
+import { sortCategories, type Category, type CategoryOrderUpdate, type CategoryType } from '@/domain/category';
 
 interface CategoryRow {
   id: string;
@@ -62,7 +62,7 @@ class SQLiteCategoryRepository implements CategoryRepository {
       ...parameters,
     );
 
-    return rows.map(toCategory);
+    return sortCategories(rows.map(toCategory));
   }
 
   async save(category: Category): Promise<void> {
@@ -110,6 +110,26 @@ class SQLiteCategoryRepository implements CategoryRepository {
     if (result.changes === 0) {
       throw new Error('변경할 카테고리를 찾지 못했습니다.');
     }
+  }
+
+  async setSortOrders(
+    updates: readonly CategoryOrderUpdate[],
+    updatedAt: string,
+  ): Promise<void> {
+    const database = await getNativeDatabase();
+    await database.withExclusiveTransactionAsync(async (transaction) => {
+      for (const update of updates) {
+        const result = await transaction.runAsync(
+          'UPDATE categories SET sort_order = ?, updated_at = ? WHERE id = ?',
+          update.sortOrder,
+          updatedAt,
+          update.id,
+        );
+        if (result.changes === 0) {
+          throw new Error('순서를 변경할 카테고리를 찾지 못했습니다.');
+        }
+      }
+    });
   }
 }
 

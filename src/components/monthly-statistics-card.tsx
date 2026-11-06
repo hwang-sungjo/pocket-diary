@@ -26,20 +26,29 @@ import {
 interface MonthlyStatisticsCardProps {
   categoryLimit?: number;
   showMonthNavigation?: boolean;
+  source?: {
+    aggregates: TransactionAggregate[];
+    categories: Category[];
+  };
 }
 
 export function MonthlyStatisticsCard({
   categoryLimit,
   showMonthNavigation = false,
+  source,
 }: MonthlyStatisticsCardProps) {
   const [month, setMonth] = useState(() => toMonthKey(new Date()));
   const [aggregates, setAggregates] = useState<TransactionAggregate[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const externallyManaged = source !== undefined;
 
   useFocusEffect(
     useCallback(() => {
+      if (externallyManaged) {
+        return;
+      }
       let active = true;
 
       Promise.all([
@@ -69,16 +78,16 @@ export function MonthlyStatisticsCard({
       return () => {
         active = false;
       };
-    }, []),
+    }, [externallyManaged]),
   );
 
   const statistics = useMemo(
-    () => calculateMonthlyStatistics(aggregates, month),
-    [aggregates, month],
+    () => calculateMonthlyStatistics(source?.aggregates ?? aggregates, month),
+    [source, aggregates, month],
   );
   const categoryNames = useMemo(
-    () => new Map(categories.map(({ id, name }) => [id, name])),
-    [categories],
+    () => new Map((source?.categories ?? categories).map(({ id, name }) => [id, name])),
+    [source, categories],
   );
   const visibleCategoryExpenses =
     categoryLimit === undefined
@@ -89,7 +98,7 @@ export function MonthlyStatisticsCard({
     ...statistics.categoryExpenses.map(({ amount }) => Math.abs(amount)),
   );
 
-  if (loading) {
+  if (!externallyManaged && loading) {
     return (
       <View style={styles.status} testID="statistics-loading">
         <ActivityIndicator color={colors.primary} />
@@ -98,7 +107,7 @@ export function MonthlyStatisticsCard({
     );
   }
 
-  if (error) {
+  if (!externallyManaged && error) {
     return (
       <Text
         accessibilityLiveRegion="assertive"

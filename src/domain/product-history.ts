@@ -31,6 +31,13 @@ export function buildProductPurchaseHistories(
   const histories = new Map<string, ProductPurchaseHistory>();
 
   for (const aggregate of aggregates) {
+    if (
+      aggregate.transaction.type !== 'expense' ||
+      aggregate.transaction.status !== 'confirmed'
+    ) {
+      continue;
+    }
+
     for (const item of aggregate.items) {
       const key = productIdentityKey(item.productName, item.specification);
       const history = histories.get(key) ?? {

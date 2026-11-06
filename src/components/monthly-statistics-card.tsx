@@ -27,6 +27,7 @@ interface MonthlyStatisticsCardProps {
   categoryLimit?: number;
   showMonthNavigation?: boolean;
   showMerchantExpenses?: boolean;
+  showProductExpenses?: boolean;
   source?: {
     aggregates: TransactionAggregate[];
     categories: Category[];
@@ -37,6 +38,7 @@ export function MonthlyStatisticsCard({
   categoryLimit,
   showMonthNavigation = false,
   showMerchantExpenses = false,
+  showProductExpenses = false,
   source,
 }: MonthlyStatisticsCardProps) {
   const [month, setMonth] = useState(() => toMonthKey(new Date()));
@@ -104,6 +106,10 @@ export function MonthlyStatisticsCard({
   const maxMerchantAmount = Math.max(
     1,
     ...statistics.merchantExpenses.map(({ amount }) => amount),
+  );
+  const maxProductAmount = Math.max(
+    1,
+    ...statistics.productExpenses.map(({ amount }) => amount),
   );
 
   if (!externallyManaged && loading) {
@@ -269,11 +275,11 @@ export function MonthlyStatisticsCard({
                       }
                     >
                       <View style={styles.categoryLabels}>
-                        <View style={styles.merchantNameGroup}>
-                          <Text numberOfLines={1} style={styles.merchantName}>
+                        <View style={styles.statNameGroup}>
+                          <Text numberOfLines={1} style={styles.statName}>
                             {name}
                           </Text>
-                          <Text style={styles.merchantCount}>
+                          <Text style={styles.statMeta}>
                             {transactionCount}건
                           </Text>
                         </View>
@@ -288,6 +294,58 @@ export function MonthlyStatisticsCard({
                   );
                 },
               )}
+            </View>
+          )}
+        </View>
+      ) : null}
+
+      {showProductExpenses ? (
+        <View style={sharedStyles.card} testID="product-statistics">
+          <View style={styles.categoryHeader}>
+            <Text style={sharedStyles.cardTitle}>품목별 누적 지출</Text>
+            <Text style={styles.categoryRule}>상세 품목 입력액 기준 · 미분류 금액 제외</Text>
+          </View>
+
+          {statistics.productExpenses.length === 0 ? (
+            <Text style={sharedStyles.body}>
+              선택한 달에 기록된 상세 품목 지출이 없습니다.
+            </Text>
+          ) : (
+            <View style={styles.categoryRows}>
+              {statistics.productExpenses.map((product, index) => {
+                const width = `${Math.max(
+                  3,
+                  Math.round((product.amount / maxProductAmount) * 100),
+                )}%` as DimensionValue;
+
+                return (
+                  <View
+                    accessibilityLabel={`${product.name}${product.specification ? ` ${product.specification}` : ''} 지출 ${formatKRW(product.amount)}원, 품목 기록 ${product.itemCount}건`}
+                    accessible
+                    key={product.key}
+                    style={styles.categoryRow}
+                    testID={`product-stat-${index}`}
+                  >
+                    <View style={styles.categoryLabels}>
+                      <View style={styles.statNameGroup}>
+                        <Text numberOfLines={1} style={styles.statName}>
+                          {product.name}
+                        </Text>
+                        <Text style={styles.statMeta}>
+                          {product.specification ? `${product.specification} · ` : ''}
+                          품목 기록 {product.itemCount}건
+                        </Text>
+                      </View>
+                      <Text style={styles.categoryAmount}>
+                        {formatKRW(product.amount)}원
+                      </Text>
+                    </View>
+                    <View style={styles.barTrack}>
+                      <View style={[styles.bar, { width }]} />
+                    </View>
+                  </View>
+                );
+              })}
             </View>
           )}
         </View>
@@ -428,17 +486,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
-  merchantNameGroup: {
+  statNameGroup: {
     flex: 1,
     gap: 2,
     minWidth: 0,
   },
-  merchantName: {
+  statName: {
     color: colors.text,
     fontSize: 14,
     fontWeight: '700',
   },
-  merchantCount: {
+  statMeta: {
     color: colors.muted,
     fontSize: 12,
   },

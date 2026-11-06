@@ -30,7 +30,12 @@ function aggregate({
   categoryId: string;
   merchantName?: string | null;
   status?: TransactionStatus;
-  items?: { amount: number; categoryId?: string | null }[];
+  items?: {
+    amount: number;
+    categoryId?: string | null;
+    name?: string;
+    specification?: string | null;
+  }[];
 }): TransactionAggregate {
   return {
     transaction: {
@@ -55,12 +60,12 @@ function aggregate({
       id: `${id}-item-${index}`,
       transactionId: id,
       productId: `${id}-product-${index}`,
-      productName: `품목 ${index + 1}`,
+      productName: item.name ?? `품목 ${index + 1}`,
       categoryId: item.categoryId ?? null,
       quantity: 1,
       unitPrice: item.amount,
       totalPrice: item.amount,
-      specification: null,
+      specification: item.specification ?? null,
       memo: null,
     })),
   };
@@ -126,11 +131,103 @@ test('월별 합계와 품목·미분류 카테고리 금액이 수기 계산과
         transactionCount: 2,
       },
     ],
+    productExpenses: [
+      {
+        key: '품목 2\u0000',
+        name: '품목 2',
+        specification: null,
+        amount: 13_900,
+        itemCount: 1,
+      },
+      {
+        key: '품목 1\u0000',
+        name: '품목 1',
+        specification: null,
+        amount: 5_600,
+        itemCount: 1,
+      },
+    ],
     excludedPendingCount: 1,
   });
   assert.equal(
     statistics.categoryExpenses.reduce((sum, entry) => sum + entry.amount, 0),
     statistics.expense,
+  );
+});
+
+test('품목별 지출은 이름·규격별로 묶고 확정 지출의 상세 품목 금액만 누적한다', () => {
+  const statistics = calculateMonthlyStatistics(
+    [
+      aggregate({
+        id: 'shopping',
+        type: 'expense',
+        amount: 7_000,
+        categoryId: GROCERY,
+        items: [
+          { name: '우유', specification: '1L', amount: 2_000 },
+          { name: '우유', specification: '2L', amount: 5_000 },
+        ],
+      }),
+      aggregate({
+        id: 'repeat',
+        type: 'expense',
+        amount: 5_000,
+        categoryId: GROCERY,
+        items: [{ name: ' 우유 ', specification: '1l', amount: 4_000 }],
+      }),
+      aggregate({
+        id: 'unclassified',
+        type: 'expense',
+        amount: 3_000,
+        categoryId: FOOD,
+      }),
+      aggregate({
+        id: 'income',
+        type: 'income',
+        amount: 9_000,
+        categoryId: SALARY,
+        items: [{ name: '우유', specification: '1L', amount: 9_000 }],
+      }),
+      aggregate({
+        id: 'pending',
+        type: 'expense',
+        amount: 10_000,
+        categoryId: FOOD,
+        status: 'needs_confirmation',
+        items: [{ name: '우유', specification: '1L', amount: 10_000 }],
+      }),
+      aggregate({
+        id: 'previous-month',
+        type: 'expense',
+        amount: 4_000,
+        categoryId: FOOD,
+        occurredAt: '2026-07-15T03:00:00.000Z',
+        items: [{ name: '우유', specification: '1L', amount: 4_000 }],
+      }),
+    ],
+    '2026-08',
+  );
+
+  assert.deepEqual(statistics.productExpenses, [
+    {
+      key: '우유\u00001l',
+      name: '우유',
+      specification: '1L',
+      amount: 6_000,
+      itemCount: 2,
+    },
+    {
+      key: '우유\u00002l',
+      name: '우유',
+      specification: '2L',
+      amount: 5_000,
+      itemCount: 1,
+    },
+  ]);
+  assert.equal(statistics.expense, 15_000);
+  assert.equal(
+    statistics.productExpenses.reduce((sum, entry) => sum + entry.amount, 0),
+    11_000,
   );
 });
 

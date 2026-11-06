@@ -124,7 +124,7 @@ async function seedStatisticsSample(page: Page): Promise<void> {
           quantity: 2,
           unitPrice: 2_800,
           totalPrice: 5_600,
-          specification: null,
+          specification: '1L',
           memo: null,
         },
         {
@@ -177,7 +177,7 @@ async function seedStatisticsSample(page: Page): Promise<void> {
   );
 }
 
-test('월별·카테고리·상점 통계가 수기 계산과 일치하고 화면이 반응형으로 표시된다', async ({
+test('월별·카테고리·상점·품목 통계가 수기 계산과 일치하고 화면이 반응형으로 표시된다', async ({
   page,
 }) => {
   await page.goto('/stats');
@@ -203,6 +203,11 @@ test('월별·카테고리·상점 통계가 수기 계산과 일치하고 화�
   await expect(page.getByTestId('merchant-stat-named-샘플 마트')).toContainText('48,500원');
   await expect(page.getByTestId('merchant-stat-named-샘플 마트')).toContainText('1건');
   await expect(page.getByTestId('merchant-stat-unassigned')).toContainText('20,000원');
+  await expect(page.getByTestId('product-stat-0')).toContainText('세제');
+  await expect(page.getByTestId('product-stat-0')).toContainText('13,900원');
+  await expect(page.getByTestId('product-stat-1')).toContainText('우유');
+  await expect(page.getByTestId('product-stat-1')).toContainText('1L');
+  await expect(page.getByTestId('product-stat-1')).toContainText('5,600원');
 
   await page.getByRole('button', { name: '통계 이전 달' }).click();
   await expect(page.getByTestId('monthly-income')).toContainText('0원');
@@ -213,6 +218,9 @@ test('월별·카테고리·상점 통계가 수기 계산과 일치하고 화�
   );
   await expect(page.getByTestId('merchant-stat-unassigned')).toContainText('100,000원');
   await expect(page.getByTestId('merchant-stat-named-샘플 마트')).toHaveCount(0);
+  await expect(page.getByTestId('product-statistics')).toContainText(
+    '선택한 달에 기록된 상세 품목 지출이 없습니다.',
+  );
 
   await page.getByRole('button', { name: '통계 다음 달' }).click();
   await expect(page.getByTestId('monthly-expense')).toContainText('68,500원');
@@ -227,6 +235,7 @@ test('월별·카테고리·상점 통계가 수기 계산과 일치하고 화�
 
   await page.goto('/');
   await expect(page.getByTestId('merchant-statistics')).toHaveCount(0);
+  await expect(page.getByTestId('product-statistics')).toHaveCount(0);
   await expect(page.getByTestId('monthly-income')).toContainText('3,000,000원');
   await expect(page.getByTestId('monthly-expense')).toContainText('68,500원');
   await expect(page.getByTestId('monthly-balance')).toContainText('2,931,500원');

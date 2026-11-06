@@ -14,6 +14,7 @@ test('빈 화면과 기본 접근성 정보를 제공한다', async ({ page }) =
   await expect(page.getByRole('heading', { name: '통계' })).toBeVisible();
   await expect(page.getByText('선택한 달에 확정된 지출이 없습니다.')).toBeVisible();
   await expect(page.getByText('선택한 달에 상점별로 집계할 확정 지출이 없습니다.')).toBeVisible();
+  await expect(page.getByText('선택한 달에 기록된 상세 품목 지출이 없습니다.')).toBeVisible();
   await expect(page.getByLabel('수입 0원')).toBeVisible();
   await expect(page.getByLabel('지출 0원')).toBeVisible();
   await expect(page.getByLabel('잔액 0원')).toBeVisible();

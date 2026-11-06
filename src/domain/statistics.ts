@@ -1,4 +1,5 @@
 import { normalizeLookupValue } from '@/domain/autocomplete';
+import { productIdentityKey } from '@/domain/product-history';
 import type { TransactionAggregate } from '@/domain/transaction';
 import { calculateItemTotal } from '@/domain/transaction';
 import { filterTransactionsByMonth } from '@/domain/transaction-query';
@@ -15,12 +16,21 @@ export interface MerchantExpenseStatistic {
   transactionCount: number;
 }
 
+export interface ProductExpenseStatistic {
+  key: string;
+  name: string;
+  specification: string | null;
+  amount: number;
+  itemCount: number;
+}
+
 export interface MonthlyStatistics {
   income: number;
   expense: number;
   balance: number;
   categoryExpenses: CategoryExpenseStatistic[];
   merchantExpenses: MerchantExpenseStatistic[];
+  productExpenses: ProductExpenseStatistic[];
   excludedPendingCount: number;
 }
 
@@ -38,6 +48,7 @@ export function calculateMonthlyStatistics(
   );
   const categoryAmounts = new Map<string, number>();
   const merchantAmounts = new Map<string | null, MerchantExpenseStatistic>();
+  const productAmounts = new Map<string, ProductExpenseStatistic>();
   let income = 0;
   let expense = 0;
 
@@ -70,6 +81,20 @@ export function calculateMonthlyStatistics(
         item.categoryId ?? transaction.categoryId,
         item.totalPrice,
       );
+
+      const key = productIdentityKey(item.productName, item.specification);
+      const previousProduct = productAmounts.get(key);
+      const specification =
+        item.specification?.trim().replace(/\s+/g, ' ') || null;
+      productAmounts.set(key, {
+        key,
+        name:
+          previousProduct?.name ??
+          item.productName.trim().replace(/\s+/g, ' '),
+        specification: previousProduct?.specification ?? specification,
+        amount: (previousProduct?.amount ?? 0) + item.totalPrice,
+        itemCount: (previousProduct?.itemCount ?? 0) + 1,
+      });
     }
 
     const unclassifiedAmount =
@@ -97,6 +122,10 @@ export function calculateMonthlyStatistics(
       (left, right) =>
         right.amount - left.amount ||
         (left.merchantName ?? '').localeCompare(right.merchantName ?? '', 'ko'),
+    ),
+    productExpenses: [...productAmounts.values()].sort(
+      (left, right) =>
+        right.amount - left.amount || left.key.localeCompare(right.key, 'ko'),
     ),
     excludedPendingCount: monthlyAggregates.filter(
       ({ transaction }) => transaction.status === 'needs_confirmation',

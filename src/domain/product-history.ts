@@ -18,6 +18,13 @@ export interface ProductPurchaseHistory {
   purchases: ProductPurchase[];
 }
 
+export function productIdentityKey(
+  name: string,
+  specification: string | null,
+): string {
+  return `${normalizeLookupValue(name)}\u0000${normalizeLookupValue(specification ?? '')}`;
+}
+
 export function buildProductPurchaseHistories(
   aggregates: readonly TransactionAggregate[],
 ): ProductPurchaseHistory[] {
@@ -25,11 +32,7 @@ export function buildProductPurchaseHistories(
 
   for (const aggregate of aggregates) {
     for (const item of aggregate.items) {
-      const normalizedName = normalizeLookupValue(item.productName);
-      const normalizedSpecification = normalizeLookupValue(
-        item.specification ?? '',
-      );
-      const key = `${normalizedName}\u0000${normalizedSpecification}`;
+      const key = productIdentityKey(item.productName, item.specification);
       const history = histories.get(key) ?? {
         key,
         name: item.productName,

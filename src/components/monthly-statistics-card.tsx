@@ -26,6 +26,7 @@ import {
 interface MonthlyStatisticsCardProps {
   categoryLimit?: number;
   showMonthNavigation?: boolean;
+  showMerchantExpenses?: boolean;
   source?: {
     aggregates: TransactionAggregate[];
     categories: Category[];
@@ -35,6 +36,7 @@ interface MonthlyStatisticsCardProps {
 export function MonthlyStatisticsCard({
   categoryLimit,
   showMonthNavigation = false,
+  showMerchantExpenses = false,
   source,
 }: MonthlyStatisticsCardProps) {
   const [month, setMonth] = useState(() => toMonthKey(new Date()));
@@ -50,6 +52,8 @@ export function MonthlyStatisticsCard({
         return;
       }
       let active = true;
+      setLoading(true);
+      setError(null);
 
       Promise.all([
         localTransactionRepository.list(),
@@ -96,6 +100,10 @@ export function MonthlyStatisticsCard({
   const maxCategoryAmount = Math.max(
     1,
     ...statistics.categoryExpenses.map(({ amount }) => Math.abs(amount)),
+  );
+  const maxMerchantAmount = Math.max(
+    1,
+    ...statistics.merchantExpenses.map(({ amount }) => amount),
   );
 
   if (!externallyManaged && loading) {
@@ -226,6 +234,64 @@ export function MonthlyStatisticsCard({
           </View>
         )}
       </View>
+
+      {showMerchantExpenses ? (
+        <View style={sharedStyles.card} testID="merchant-statistics">
+          <View style={styles.categoryHeader}>
+            <Text style={sharedStyles.cardTitle}>상점별 지출</Text>
+            <Text style={styles.categoryRule}>거래 총액 기준 · 상점 미입력 포함</Text>
+          </View>
+
+          {statistics.merchantExpenses.length === 0 ? (
+            <Text style={sharedStyles.body}>
+              선택한 달에 상점별로 집계할 확정 지출이 없습니다.
+            </Text>
+          ) : (
+            <View style={styles.categoryRows}>
+              {statistics.merchantExpenses.map(
+                ({ merchantKey, merchantName, amount, transactionCount }) => {
+                  const name = merchantName ?? '상점 미입력';
+                  const width = `${Math.max(
+                    3,
+                    Math.round((amount / maxMerchantAmount) * 100),
+                  )}%` as DimensionValue;
+
+                  return (
+                    <View
+                      accessibilityLabel={`${name} 지출 ${formatKRW(amount)}원, ${transactionCount}건`}
+                      accessible
+                      key={merchantKey === null ? 'unassigned' : `named:${merchantKey}`}
+                      style={styles.categoryRow}
+                      testID={
+                        merchantKey === null
+                          ? 'merchant-stat-unassigned'
+                          : `merchant-stat-named-${merchantKey}`
+                      }
+                    >
+                      <View style={styles.categoryLabels}>
+                        <View style={styles.merchantNameGroup}>
+                          <Text numberOfLines={1} style={styles.merchantName}>
+                            {name}
+                          </Text>
+                          <Text style={styles.merchantCount}>
+                            {transactionCount}건
+                          </Text>
+                        </View>
+                        <Text style={styles.categoryAmount}>
+                          {formatKRW(amount)}원
+                        </Text>
+                      </View>
+                      <View style={styles.barTrack}>
+                        <View style={[styles.bar, { width }]} />
+                      </View>
+                    </View>
+                  );
+                },
+              )}
+            </View>
+          )}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -361,6 +427,20 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: '700',
+  },
+  merchantNameGroup: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0,
+  },
+  merchantName: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  merchantCount: {
+    color: colors.muted,
+    fontSize: 12,
   },
   categoryAmount: {
     color: colors.text,

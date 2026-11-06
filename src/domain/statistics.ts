@@ -1,3 +1,4 @@
+import { normalizeLookupValue } from '@/domain/autocomplete';
 import type { TransactionAggregate } from '@/domain/transaction';
 import { calculateItemTotal } from '@/domain/transaction';
 import { filterTransactionsByMonth } from '@/domain/transaction-query';
@@ -7,11 +8,19 @@ export interface CategoryExpenseStatistic {
   amount: number;
 }
 
+export interface MerchantExpenseStatistic {
+  merchantKey: string | null;
+  merchantName: string | null;
+  amount: number;
+  transactionCount: number;
+}
+
 export interface MonthlyStatistics {
   income: number;
   expense: number;
   balance: number;
   categoryExpenses: CategoryExpenseStatistic[];
+  merchantExpenses: MerchantExpenseStatistic[];
   excludedPendingCount: number;
 }
 
@@ -28,6 +37,7 @@ export function calculateMonthlyStatistics(
     ({ transaction }) => transaction.status === 'confirmed',
   );
   const categoryAmounts = new Map<string, number>();
+  const merchantAmounts = new Map<string | null, MerchantExpenseStatistic>();
   let income = 0;
   let expense = 0;
 
@@ -40,6 +50,19 @@ export function calculateMonthlyStatistics(
     }
 
     expense += transaction.totalAmount;
+
+    const merchantName =
+      transaction.merchantName?.trim().replace(/\s+/g, ' ') || null;
+    const merchantKey = merchantName
+      ? normalizeLookupValue(merchantName)
+      : null;
+    const previousMerchant = merchantAmounts.get(merchantKey);
+    merchantAmounts.set(merchantKey, {
+      merchantKey,
+      merchantName: previousMerchant?.merchantName ?? merchantName,
+      amount: (previousMerchant?.amount ?? 0) + transaction.totalAmount,
+      transactionCount: (previousMerchant?.transactionCount ?? 0) + 1,
+    });
 
     for (const item of items) {
       addCategoryAmount(
@@ -70,6 +93,11 @@ export function calculateMonthlyStatistics(
           right.amount - left.amount ||
           left.categoryId.localeCompare(right.categoryId),
       ),
+    merchantExpenses: [...merchantAmounts.values()].sort(
+      (left, right) =>
+        right.amount - left.amount ||
+        (left.merchantName ?? '').localeCompare(right.merchantName ?? '', 'ko'),
+    ),
     excludedPendingCount: monthlyAggregates.filter(
       ({ transaction }) => transaction.status === 'needs_confirmation',
     ).length,

@@ -19,6 +19,7 @@ function aggregate({
   amount,
   occurredAt = '2026-08-15T03:00:00.000Z',
   categoryId,
+  merchantName = null,
   status = 'confirmed',
   items = [],
 }: {
@@ -27,6 +28,7 @@ function aggregate({
   amount: number;
   occurredAt?: string;
   categoryId: string;
+  merchantName?: string | null;
   status?: TransactionStatus;
   items?: { amount: number; categoryId?: string | null }[];
 }): TransactionAggregate {
@@ -39,7 +41,7 @@ function aggregate({
       occurredAt,
       categoryId,
       merchantId: null,
-      merchantName: null,
+      merchantName,
       paymentMethod: null,
       memo: null,
       status,
@@ -116,10 +118,89 @@ test('월별 합계와 품목·미분류 카테고리 금액이 수기 계산과
       { categoryId: FOOD, amount: 20_000 },
       { categoryId: HOUSEHOLD, amount: 13_900 },
     ],
+    merchantExpenses: [
+      {
+        merchantKey: null,
+        merchantName: null,
+        amount: 68_500,
+        transactionCount: 2,
+      },
+    ],
     excludedPendingCount: 1,
   });
   assert.equal(
     statistics.categoryExpenses.reduce((sum, entry) => sum + entry.amount, 0),
+    statistics.expense,
+  );
+});
+
+test('상점별 지출은 거래 총액을 한 번씩 합산하고 이름 변형과 미입력을 묶는다', () => {
+  const statistics = calculateMonthlyStatistics(
+    [
+      aggregate({
+        id: 'itemized',
+        type: 'expense',
+        amount: 48_000,
+        categoryId: GROCERY,
+        merchantName: '  OO마트  ',
+        items: [{ amount: 15_000 }, { amount: 10_000 }],
+      }),
+      aggregate({
+        id: 'same-merchant',
+        type: 'expense',
+        amount: 12_000,
+        categoryId: GROCERY,
+        merchantName: 'oo마트',
+      }),
+      aggregate({
+        id: 'unassigned',
+        type: 'expense',
+        amount: 5_000,
+        categoryId: FOOD,
+      }),
+      aggregate({
+        id: 'pending',
+        type: 'expense',
+        amount: 9_000,
+        categoryId: FOOD,
+        merchantName: 'OO마트',
+        status: 'needs_confirmation',
+      }),
+      aggregate({
+        id: 'income',
+        type: 'income',
+        amount: 100_000,
+        categoryId: SALARY,
+        merchantName: 'OO마트',
+      }),
+      aggregate({
+        id: 'previous-month',
+        type: 'expense',
+        amount: 8_000,
+        categoryId: FOOD,
+        merchantName: 'OO마트',
+        occurredAt: '2026-07-15T03:00:00.000Z',
+      }),
+    ],
+    '2026-08',
+  );
+
+  assert.deepEqual(statistics.merchantExpenses, [
+    {
+      merchantKey: 'oo마트',
+      merchantName: 'OO마트',
+      amount: 60_000,
+      transactionCount: 2,
+    },
+    {
+      merchantKey: null,
+      merchantName: null,
+      amount: 5_000,
+      transactionCount: 1,
+    },
+  ]);
+  assert.equal(
+    statistics.merchantExpenses.reduce((sum, entry) => sum + entry.amount, 0),
     statistics.expense,
   );
 });

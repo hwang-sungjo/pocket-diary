@@ -19,6 +19,7 @@ import {
   type ProductPurchaseHistory,
 } from '@/domain/product-history';
 import { calculateProductPurchaseCycle } from '@/domain/product-purchase-cycle';
+import { calculateProductPriceChange } from '@/domain/product-price-change';
 
 const purchaseDateFormatter = new Intl.DateTimeFormat('ko-KR', {
   year: 'numeric',
@@ -104,6 +105,7 @@ export function ProductHistoryList() {
 
       {filteredHistories.map((history, index) => {
         const cycle = calculateProductPurchaseCycle(history.purchases);
+        const priceChange = calculateProductPriceChange(history.purchases);
 
         return (
           <View
@@ -149,6 +151,43 @@ export function ProductHistoryList() {
               ) : (
                 <Text style={styles.cycleNote}>
                   데이터 부족 · 날짜가 다른 구매 3회부터 표시합니다.
+                </Text>
+              )}
+            </View>
+
+            <View style={styles.priceTrend} testID={`product-price-change-${index}`}>
+              <Text style={styles.priceTrendTitle}>최근 단가 변화</Text>
+              {priceChange ? (
+                <View style={styles.priceTrendDetails}>
+                  <Text
+                    style={styles.priceTrendValues}
+                    testID={`product-price-values-${index}`}
+                  >
+                    {formatKRW(priceChange.previousUnitPrice)}원 →{' '}
+                    {formatKRW(priceChange.currentUnitPrice)}원
+                  </Text>
+                  <Text
+                    style={[
+                      styles.priceTrendDifference,
+                      priceChange.difference > 0 && styles.priceIncrease,
+                      priceChange.difference < 0 && styles.priceDecrease,
+                    ]}
+                    testID={`product-price-difference-${index}`}
+                  >
+                    {priceChange.difference > 0
+                      ? `+${formatKRW(priceChange.difference)}원 상승`
+                      : priceChange.difference < 0
+                        ? `${formatKRW(Math.abs(priceChange.difference))}원 하락`
+                        : '변동 없음'}
+                  </Text>
+                  <Text style={styles.priceTrendNote}>
+                    {purchaseDateFormatter.format(new Date(priceChange.previousOccurredAt))}과{' '}
+                    {purchaseDateFormatter.format(new Date(priceChange.currentOccurredAt))}의 단가 비교
+                  </Text>
+                </View>
+              ) : (
+                <Text style={styles.priceTrendNote}>
+                  비교할 단가 기록이 부족합니다.
                 </Text>
               )}
             </View>
@@ -250,6 +289,43 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   cycleNote: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  priceTrend: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 4,
+    padding: 12,
+  },
+  priceTrendDetails: {
+    gap: 3,
+  },
+  priceTrendTitle: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  priceTrendValues: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  priceTrendDifference: {
+    color: colors.muted,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  priceIncrease: {
+    color: colors.danger,
+  },
+  priceDecrease: {
+    color: colors.success,
+  },
+  priceTrendNote: {
     color: colors.muted,
     fontSize: 12,
     lineHeight: 18,

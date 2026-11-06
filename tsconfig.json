@@ -20,7 +20,10 @@
     "expo-env.d.ts"
   ],
   "exclude": [
-    "**/*.test.ts"
+    "**/*.test.ts",
+    "e2e/**/*.ts",
+    "e2e-pwa/**/*.ts",
+    "playwright*.config.ts"
   ]
 }
 

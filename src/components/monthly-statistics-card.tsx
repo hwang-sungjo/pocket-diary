@@ -1,7 +1,8 @@
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -9,6 +10,7 @@ import {
 } from 'react-native';
 
 import { sharedStyles } from '@/components/screen';
+import { MonthlyComparisonCard } from '@/components/monthly-comparison-card';
 import { AppButton } from '@/components/ui/app-button';
 import { colors } from '@/constants/theme';
 import { localCategoryRepository } from '@/data/local-category-repository';
@@ -28,6 +30,7 @@ interface MonthlyStatisticsCardProps {
   showMonthNavigation?: boolean;
   showMerchantExpenses?: boolean;
   showProductExpenses?: boolean;
+  showMonthComparison?: boolean;
   source?: {
     aggregates: TransactionAggregate[];
     categories: Category[];
@@ -39,6 +42,7 @@ export function MonthlyStatisticsCard({
   showMonthNavigation = false,
   showMerchantExpenses = false,
   showProductExpenses = false,
+  showMonthComparison = false,
   source,
 }: MonthlyStatisticsCardProps) {
   const [month, setMonth] = useState(() => toMonthKey(new Date()));
@@ -87,9 +91,18 @@ export function MonthlyStatisticsCard({
     }, [externallyManaged]),
   );
 
+  const visibleAggregates = source?.aggregates ?? aggregates;
   const statistics = useMemo(
-    () => calculateMonthlyStatistics(source?.aggregates ?? aggregates, month),
-    [source, aggregates, month],
+    () => calculateMonthlyStatistics(visibleAggregates, month),
+    [visibleAggregates, month],
+  );
+  const previousMonth = shiftMonth(month, -1);
+  const previousStatistics = useMemo(
+    () =>
+      showMonthComparison
+        ? calculateMonthlyStatistics(visibleAggregates, previousMonth)
+        : null,
+    [visibleAggregates, previousMonth, showMonthComparison],
   );
   const categoryNames = useMemo(
     () => new Map((source?.categories ?? categories).map(({ id, name }) => [id, name])),
@@ -178,6 +191,15 @@ export function MonthlyStatisticsCard({
         />
       </View>
 
+      {previousStatistics ? (
+        <MonthlyComparisonCard
+          current={statistics}
+          month={month}
+          previous={previousStatistics}
+          previousMonth={previousMonth}
+        />
+      ) : null}
+
       {statistics.excludedPendingCount > 0 ? (
         <Text style={styles.pendingNotice} testID="pending-statistics-notice">
           금액 확인 필요 {statistics.excludedPendingCount}건은 통계에서
@@ -204,11 +226,12 @@ export function MonthlyStatisticsCard({
               )}%` as DimensionValue;
 
               return (
-                <View
+                <Pressable
                   accessibilityLabel={`${categoryNames.get(categoryId) ?? '알 수 없는 카테고리'} 지출 ${formatKRW(amount)}원`}
-                  accessible
+                  accessibilityRole="button"
                   key={categoryId}
-                  style={styles.categoryRow}
+                  onPress={() => router.push({ pathname: '/stat-transactions', params: { month, kind: 'category', categoryId } })}
+                  style={({ pressed }) => [styles.categoryRow, pressed && styles.pressed]}
                   testID={`category-stat-${categoryId}`}
                 >
                   <View style={styles.categoryLabels}>
@@ -234,7 +257,7 @@ export function MonthlyStatisticsCard({
                       ]}
                     />
                   </View>
-                </View>
+                </Pressable>
               );
             })}
           </View>
@@ -263,11 +286,12 @@ export function MonthlyStatisticsCard({
                   )}%` as DimensionValue;
 
                   return (
-                    <View
+                    <Pressable
                       accessibilityLabel={`${name} 지출 ${formatKRW(amount)}원, ${transactionCount}건`}
-                      accessible
+                      accessibilityRole="button"
                       key={merchantKey === null ? 'unassigned' : `named:${merchantKey}`}
-                      style={styles.categoryRow}
+                      onPress={() => router.push({ pathname: '/stat-transactions', params: { month, kind: 'merchant', ...(merchantName ? { merchantName } : {}) } })}
+                      style={({ pressed }) => [styles.categoryRow, pressed && styles.pressed]}
                       testID={
                         merchantKey === null
                           ? 'merchant-stat-unassigned'
@@ -290,7 +314,7 @@ export function MonthlyStatisticsCard({
                       <View style={styles.barTrack}>
                         <View style={[styles.bar, { width }]} />
                       </View>
-                    </View>
+                    </Pressable>
                   );
                 },
               )}
@@ -319,11 +343,12 @@ export function MonthlyStatisticsCard({
                 )}%` as DimensionValue;
 
                 return (
-                  <View
+                  <Pressable
                     accessibilityLabel={`${product.name}${product.specification ? ` ${product.specification}` : ''} 지출 ${formatKRW(product.amount)}원, 품목 기록 ${product.itemCount}건`}
-                    accessible
+                    accessibilityRole="button"
                     key={product.key}
-                    style={styles.categoryRow}
+                    onPress={() => router.push({ pathname: '/stat-transactions', params: { month, kind: 'product', productName: product.name, ...(product.specification ? { specification: product.specification } : {}) } })}
+                    style={({ pressed }) => [styles.categoryRow, pressed && styles.pressed]}
                     testID={`product-stat-${index}`}
                   >
                     <View style={styles.categoryLabels}>
@@ -343,7 +368,7 @@ export function MonthlyStatisticsCard({
                     <View style={styles.barTrack}>
                       <View style={[styles.bar, { width }]} />
                     </View>
-                  </View>
+                  </Pressable>
                 );
               })}
             </View>
@@ -473,6 +498,9 @@ const styles = StyleSheet.create({
   },
   categoryRow: {
     gap: 7,
+  },
+  pressed: {
+    opacity: 0.65,
   },
   categoryLabels: {
     alignItems: 'center',

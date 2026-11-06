@@ -6,6 +6,7 @@ export default function StatsScreen() {
     <Screen description="월별 수입·지출·잔액을 확인하는 공간" title="통계">
       <MonthlyStatisticsCard
         showMerchantExpenses
+        showMonthComparison
         showMonthNavigation
         showProductExpenses
       />

@@ -188,6 +188,9 @@ test('월별·카테고리·상점·품목 통계가 수기 계산과 일치하�
   await expect(page.getByTestId('monthly-income')).toContainText('3,000,000원');
   await expect(page.getByTestId('monthly-expense')).toContainText('68,500원');
   await expect(page.getByTestId('monthly-balance')).toContainText('2,931,500원');
+  await expect(page.getByTestId('comparison-income')).toContainText('+3,000,000원');
+  await expect(page.getByTestId('comparison-expense')).toContainText('-31,500원');
+  await expect(page.getByTestId('comparison-balance')).toContainText('+3,031,500원');
   await expect(page.getByTestId('pending-statistics-notice')).toContainText(
     '금액 확인 필요 1건',
   );
@@ -213,6 +216,9 @@ test('월별·카테고리·상점·품목 통계가 수기 계산과 일치하�
   await expect(page.getByTestId('monthly-income')).toContainText('0원');
   await expect(page.getByTestId('monthly-expense')).toContainText('100,000원');
   await expect(page.getByTestId('monthly-balance')).toContainText('-100,000원');
+  await expect(page.getByTestId('comparison-income')).toContainText('차이0원');
+  await expect(page.getByTestId('comparison-expense')).toContainText('+100,000원');
+  await expect(page.getByTestId('comparison-balance')).toContainText('-100,000원');
   await expect(page.getByTestId(`category-stat-${FOOD_CATEGORY_ID}`)).toContainText(
     '식비100,000원',
   );
@@ -234,6 +240,7 @@ test('월별·카테고리·상점·품목 통계가 수기 계산과 일치하�
   ).toBe(true);
 
   await page.goto('/');
+  await expect(page.getByTestId('monthly-comparison')).toHaveCount(0);
   await expect(page.getByTestId('merchant-statistics')).toHaveCount(0);
   await expect(page.getByTestId('product-statistics')).toHaveCount(0);
   await expect(page.getByTestId('monthly-income')).toContainText('3,000,000원');
@@ -246,4 +253,50 @@ test('월별·카테고리·상점·품목 통계가 수기 계산과 일치하�
         document.documentElement.clientWidth,
     ),
   ).toBe(true);
+});
+
+test('통계 행에서 선택한 달의 관련 거래와 반영 금액을 확인하고 거래 상세로 이동한다', async ({ page }) => {
+  await page.goto('/stats');
+  await expect(page.getByTestId('monthly-statistics')).toBeVisible();
+  await seedStatisticsSample(page);
+  await page.reload();
+
+  await page.getByTestId(`category-stat-${HOUSEHOLD_CATEGORY_ID}`).click();
+  await expect(page.getByTestId('stat-transactions-total')).toHaveText('13,900원');
+  await expect(page.getByTestId('stat-transactions-count')).toHaveText('관련 거래 1건');
+  await expect(page.getByTestId('stat-transaction-row-day-six-shopping')).toContainText('13,900원');
+  await expect(page.getByTestId('stat-transaction-row-day-six-dining')).toHaveCount(0);
+  await page.getByTestId('stat-transaction-row-day-six-shopping').click();
+  await expect(page.getByTestId('saved-transaction-detail')).toContainText('Day 6 장보기');
+  await page.goBack();
+  await expect(page.getByTestId('stat-transactions-total')).toHaveText('13,900원');
+  await page.getByRole('button', { name: '통계로 돌아가기' }).click();
+
+  await page.getByTestId('merchant-stat-named-샘플 마트').click();
+  await expect(page.getByTestId('stat-transactions-total')).toHaveText('48,500원');
+  await expect(page.getByTestId('stat-transaction-row-day-six-shopping')).toBeVisible();
+  await page.getByRole('button', { name: '통계로 돌아가기' }).click();
+
+  await page.getByTestId('product-stat-0').click();
+  await expect(page.getByTestId('stat-transactions-total')).toHaveText('13,900원');
+  await expect(page.getByTestId('stat-transaction-row-day-six-shopping')).toBeVisible();
+  await page.getByRole('button', { name: '통계로 돌아가기' }).click();
+
+  await page.getByTestId('product-stat-1').click();
+  await expect(page.getByTestId('stat-transactions-total')).toHaveText('5,600원');
+  await expect(page.getByTestId('stat-transaction-row-day-six-shopping')).toBeVisible();
+  await page.getByRole('button', { name: '통계로 돌아가기' }).click();
+
+  await page.getByTestId('merchant-stat-unassigned').click();
+  await expect(page.getByTestId('stat-transactions-total')).toHaveText('20,000원');
+  await expect(page.getByTestId('stat-transaction-row-day-six-dining')).toBeVisible();
+  await page.getByRole('button', { name: '통계로 돌아가기' }).click();
+
+  await page.getByRole('button', { name: '통계 이전 달' }).click();
+  await page.getByTestId(`category-stat-${FOOD_CATEGORY_ID}`).click();
+  await expect(page.getByTestId('stat-transactions-total')).toHaveText('100,000원');
+  await expect(page.getByTestId('stat-transaction-row-day-six-previous')).toBeVisible();
+  await expect(page.getByTestId('stat-transaction-row-day-six-dining')).toHaveCount(0);
+  await page.getByRole('button', { name: '통계로 돌아가기' }).click();
+  await expect(page.getByTestId('monthly-expense')).toContainText('100,000원');
 });

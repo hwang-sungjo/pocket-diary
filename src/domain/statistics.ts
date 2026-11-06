@@ -64,9 +64,7 @@ export function calculateMonthlyStatistics(
 
     const merchantName =
       transaction.merchantName?.trim().replace(/\s+/g, ' ') || null;
-    const merchantKey = merchantName
-      ? normalizeLookupValue(merchantName)
-      : null;
+    const merchantKey = merchantIdentityKey(transaction.merchantName);
     const previousMerchant = merchantAmounts.get(merchantKey);
     merchantAmounts.set(merchantKey, {
       merchantKey,
@@ -76,12 +74,6 @@ export function calculateMonthlyStatistics(
     });
 
     for (const item of items) {
-      addCategoryAmount(
-        categoryAmounts,
-        item.categoryId ?? transaction.categoryId,
-        item.totalPrice,
-      );
-
       const key = productIdentityKey(item.productName, item.specification);
       const previousProduct = productAmounts.get(key);
       const specification =
@@ -97,13 +89,9 @@ export function calculateMonthlyStatistics(
       });
     }
 
-    const unclassifiedAmount =
-      transaction.totalAmount - calculateItemTotal(items);
-    addCategoryAmount(
-      categoryAmounts,
-      transaction.categoryId,
-      unclassifiedAmount,
-    );
+    for (const [categoryId, amount] of expenseCategoryAllocations(aggregate)) {
+      addCategoryAmount(categoryAmounts, categoryId, amount);
+    }
   }
 
   return {
@@ -131,6 +119,30 @@ export function calculateMonthlyStatistics(
       ({ transaction }) => transaction.status === 'needs_confirmation',
     ).length,
   };
+}
+
+export function merchantIdentityKey(name: string | null): string | null {
+  const normalizedName = name?.trim().replace(/\s+/g, ' ');
+  return normalizedName ? normalizeLookupValue(normalizedName) : null;
+}
+
+export function expenseCategoryAllocations(
+  { transaction, items }: TransactionAggregate,
+): Map<string, number> {
+  const amounts = new Map<string, number>();
+  for (const item of items) {
+    addCategoryAmount(
+      amounts,
+      item.categoryId ?? transaction.categoryId,
+      item.totalPrice,
+    );
+  }
+  addCategoryAmount(
+    amounts,
+    transaction.categoryId,
+    transaction.totalAmount - calculateItemTotal(items),
+  );
+  return amounts;
 }
 
 function addCategoryAmount(

@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { calculateMonthlyStatistics } from '@/domain/statistics';
+import { selectStatisticTransactions } from '@/domain/statistic-drilldown';
+import { productIdentityKey } from '@/domain/product-history';
 import type {
   TransactionAggregate,
   TransactionStatus,
@@ -347,4 +349,42 @@ test('확인 필요 거래는 저장해 confirmed가 된 뒤에만 통계에 포
   assert.equal(beforeConfirmation.excludedPendingCount, 1);
   assert.equal(afterConfirmation.expense, 120_000);
   assert.equal(afterConfirmation.excludedPendingCount, 0);
+});
+
+test('통계 항목 관련 거래의 반영 금액 합계가 월별 통계 행과 일치한다', () => {
+  const aggregates = [
+    aggregate({
+      id: 'shopping', type: 'expense', amount: 48_500, categoryId: GROCERY,
+      merchantName: '  샘플   마트 ',
+      items: [
+        { name: '우유', specification: '1L', amount: 5_600 },
+        { name: '세제', amount: 13_900, categoryId: HOUSEHOLD },
+      ],
+    }),
+    aggregate({ id: 'dining', type: 'expense', amount: 20_000, categoryId: FOOD }),
+    aggregate({ id: 'pending', type: 'expense', amount: 90_000, categoryId: HOUSEHOLD, status: 'needs_confirmation' }),
+    aggregate({ id: 'salary', type: 'income', amount: 3_000_000, categoryId: SALARY }),
+    aggregate({ id: 'old', type: 'expense', amount: 1_000, categoryId: FOOD, occurredAt: '2026-07-15T03:00:00.000Z' }),
+  ];
+  const statistics = calculateMonthlyStatistics(aggregates, '2026-08');
+  const selections = [
+    { kind: 'category' as const, categoryId: GROCERY },
+    { kind: 'category' as const, categoryId: HOUSEHOLD },
+    { kind: 'merchant' as const, merchantKey: '샘플 마트' },
+    { kind: 'merchant' as const, merchantKey: null },
+    { kind: 'product' as const, productKey: productIdentityKey('우유', '1l') },
+  ];
+  const expected = [34_600, 13_900, 48_500, 20_000, 5_600];
+
+  selections.forEach((selection, index) => {
+    const matches = selectStatisticTransactions(aggregates, '2026-08', selection);
+    assert.equal(matches.length, 1);
+    assert.equal(matches.reduce((sum, { amount }) => sum + amount, 0), expected[index]);
+  });
+  assert.equal(
+    selectStatisticTransactions(aggregates, '2026-08', selections[1]!).at(0)?.aggregate.transaction.id,
+    'shopping',
+  );
+  assert.equal(statistics.categoryExpenses.find(({ categoryId }) => categoryId === HOUSEHOLD)?.amount, 13_900);
+  assert.equal(statistics.merchantExpenses.find(({ merchantKey }) => merchantKey === '샘플 마트')?.amount, 48_500);
 });

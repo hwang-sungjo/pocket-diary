@@ -1,4 +1,4 @@
-import type { TransactionAggregate } from '@/domain/transaction';
+import type { TransactionAggregate, TransactionType } from '@/domain/transaction';
 
 export function toMonthKey(date: Date): string {
   const year = String(date.getFullYear()).padStart(4, '0');
@@ -35,6 +35,36 @@ export function filterTransactionsByMonth(
     .sort((left, right) =>
       right.transaction.occurredAt.localeCompare(left.transaction.occurredAt),
     );
+}
+
+export interface TransactionListCriteria {
+  type: TransactionType | 'all';
+  categoryId: string | null;
+  search: string;
+}
+
+export function filterTransactionsByCriteria(
+  aggregates: readonly TransactionAggregate[],
+  { type, categoryId, search }: TransactionListCriteria,
+): TransactionAggregate[] {
+  const normalizedSearch = search.trim().toLocaleLowerCase();
+
+  return aggregates.filter(({ transaction }) => {
+    if (type !== 'all' && transaction.type !== type) {
+      return false;
+    }
+    if (categoryId !== null && transaction.categoryId !== categoryId) {
+      return false;
+    }
+    if (!normalizedSearch) {
+      return true;
+    }
+
+    return (
+      transaction.name.toLocaleLowerCase().includes(normalizedSearch) ||
+      transaction.merchantName?.toLocaleLowerCase().includes(normalizedSearch) === true
+    );
+  });
 }
 
 export interface DailyTransactionGroup {

@@ -10,13 +10,16 @@ import {
 
 import { sharedStyles } from '@/components/screen';
 import { AppButton } from '@/components/ui/app-button';
+import { AppInput } from '@/components/ui/app-input';
+import { ChoiceChips } from '@/components/ui/choice-chips';
 import { colors } from '@/constants/theme';
 import { localCategoryRepository } from '@/data/local-category-repository';
 import { localTransactionRepository } from '@/data/local-transaction-repository';
 import type { Category } from '@/domain/category';
 import { formatKRW } from '@/domain/input-values';
-import type { TransactionAggregate } from '@/domain/transaction';
+import type { TransactionAggregate, TransactionType } from '@/domain/transaction';
 import {
+  filterTransactionsByCriteria,
   filterTransactionsByMonth,
   formatMonthLabel,
   groupTransactionsByDate,
@@ -30,8 +33,17 @@ const dateFormatter = new Intl.DateTimeFormat('ko-KR', {
   weekday: 'short',
 });
 
+const transactionTypes = [
+  { label: '전체', value: 'all' },
+  { label: '지출', value: 'expense' },
+  { label: '수입', value: 'income' },
+] as const;
+
 export function TransactionList() {
   const [month, setMonth] = useState(() => toMonthKey(new Date()));
+  const [search, setSearch] = useState('');
+  const [type, setType] = useState<TransactionType | 'all'>('all');
+  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [aggregates, setAggregates] = useState<TransactionAggregate[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +52,8 @@ export function TransactionList() {
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      setLoading(true);
+      setError(null);
 
       Promise.all([
         localTransactionRepository.list(),
@@ -71,22 +85,66 @@ export function TransactionList() {
     }, []),
   );
 
-  const groups = useMemo(
-    () =>
-      groupTransactionsByDate(filterTransactionsByMonth(aggregates, month)),
+  const monthlyTransactions = useMemo(
+    () => filterTransactionsByMonth(aggregates, month),
     [aggregates, month],
+  );
+  const filteredTransactions = useMemo(
+    () =>
+      filterTransactionsByCriteria(monthlyTransactions, {
+        type,
+        categoryId,
+        search,
+      }),
+    [monthlyTransactions, type, categoryId, search],
+  );
+  const groups = useMemo(
+    () => groupTransactionsByDate(filteredTransactions),
+    [filteredTransactions],
   );
   const categoryNames = useMemo(
     () => new Map(categories.map(({ id, name }) => [id, name])),
     [categories],
   );
+  const categoryOptions = useMemo(() => {
+    const usedCategoryIds = new Set(
+      monthlyTransactions
+        .filter(({ transaction }) => type === 'all' || transaction.type === type)
+        .map(({ transaction }) => transaction.categoryId),
+    );
+    return [
+      { label: '전체 카테고리', value: 'all' },
+      ...categories
+        .filter(({ id }) => usedCategoryIds.has(id) || id === categoryId)
+        .map(({ id, name }) => ({ label: name, value: id })),
+    ];
+  }, [monthlyTransactions, categories, type, categoryId]);
+  const hasActiveFilters =
+    search.trim().length > 0 || type !== 'all' || categoryId !== null;
+  const visibleGroups = !loading && !error ? groups : [];
+
+  function changeMonth(amount: number) {
+    setMonth((current) => shiftMonth(current, amount));
+    setCategoryId(null);
+  }
+
+  function changeType(nextType: TransactionType | 'all') {
+    setType(nextType);
+    setCategoryId(null);
+  }
+
+  function resetFilters() {
+    setSearch('');
+    setType('all');
+    setCategoryId(null);
+  }
 
   return (
     <View style={styles.container} testID="transaction-list">
       <View style={styles.monthNavigation}>
         <AppButton
           accessibilityLabel="이전 달"
-          onPress={() => setMonth((current) => shiftMonth(current, -1))}
+          onPress={() => changeMonth(-1)}
           variant="secondary"
         >
           ‹
@@ -96,11 +154,50 @@ export function TransactionList() {
         </Text>
         <AppButton
           accessibilityLabel="다음 달"
-          onPress={() => setMonth((current) => shiftMonth(current, 1))}
+          onPress={() => changeMonth(1)}
           variant="secondary"
         >
           ›
         </AppButton>
+      </View>
+
+      <View style={styles.filters} testID="transaction-filters">
+        <AppInput
+          label="거래명 또는 상점명 검색"
+          onChangeText={setSearch}
+          placeholder="거래명이나 상점명 입력"
+          value={search}
+        />
+        <View style={styles.filterGroup} testID="transaction-type-filter">
+          <Text style={styles.filterLabel}>거래 유형</Text>
+          <ChoiceChips
+            accessibilityLabel="거래 유형 필터"
+            onChange={changeType}
+            options={transactionTypes}
+            value={type}
+          />
+        </View>
+        <View style={styles.filterGroup} testID="transaction-category-filter">
+          <Text style={styles.filterLabel}>거래 카테고리</Text>
+          <ChoiceChips
+            accessibilityLabel="거래 카테고리 필터"
+            onChange={(value) => setCategoryId(value === 'all' ? null : value)}
+            options={categoryOptions}
+            value={categoryId ?? 'all'}
+          />
+        </View>
+        {!loading && !error ? (
+          <View style={styles.resultsHeading}>
+            <Text style={styles.resultCount} testID="transaction-result-count">
+              {filteredTransactions.length}건
+            </Text>
+            {hasActiveFilters ? (
+              <Pressable accessibilityRole="button" onPress={resetFilters}>
+                <Text style={styles.resetFilters}>필터 초기화</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
       </View>
 
       {loading ? (
@@ -124,12 +221,14 @@ export function TransactionList() {
         <View style={sharedStyles.card}>
           <Text style={sharedStyles.cardTitle}>거래가 없습니다</Text>
           <Text style={sharedStyles.body}>
-            선택한 달에 저장된 거래가 없습니다.
+            {monthlyTransactions.length === 0
+              ? '선택한 달에 저장된 거래가 없습니다.'
+              : '검색·필터 조건에 맞는 거래가 없습니다.'}
           </Text>
         </View>
       ) : null}
 
-      {groups.map((group) => (
+      {visibleGroups.map((group) => (
         <View key={group.dateKey} style={styles.group}>
           <Text style={styles.date}>
             {dateFormatter.format(new Date(`${group.dateKey}T12:00:00`))}
@@ -207,6 +306,32 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     minWidth: 130,
     textAlign: 'center',
+  },
+  filters: {
+    gap: 14,
+  },
+  filterGroup: {
+    gap: 8,
+  },
+  filterLabel: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  resultsHeading: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  resultCount: {
+    color: colors.muted,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  resetFilters: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '700',
   },
   status: {
     alignItems: 'center',
